@@ -8,7 +8,7 @@ namespace AutoPartsSellerApp
         public Form1()
         {
             InitializeComponent();
-            // Добавьте обработчики событий
+            // Р”РѕР±Р°РІР»РµРЅРёРµ РѕР±СЂР°Р±РѕС‚С‡РёРєР° СЃРѕР±С‹С‚РёР№
             btnCategories.Click += BtnCategories_Click;
             btnStock.Click += BtnStock_Click;
             btnOrder.Click += BtnOrder_Click;
@@ -18,27 +18,27 @@ namespace AutoPartsSellerApp
 
         private void BtnCategories_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Открыта категория товаров!");
+            MessageBox.Show("РћС‚РєСЂС‹С‚Р° РєР°С‚РµРіРѕСЂРёСЏ С‚РѕРІР°СЂРѕРІ!");
         }
 
         private void BtnStock_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Просмотр склада!");
+            MessageBox.Show("РџСЂРѕСЃРјРѕС‚СЂ СЃРєР»Р°РґР°!");
         }
 
         private void BtnOrder_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Оформление заказа!");
+            MessageBox.Show("РћС„РѕСЂРјР»РµРЅРёРµ Р·Р°РєР°Р·Р°!");
         }
 
         private void BtnSettings_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Открыты настройки!");
+            MessageBox.Show("РћС‚РєСЂС‹С‚С‹ РЅР°СЃС‚СЂРѕР№РєРё!");
         }
 
         private void BtnHelp_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Справка по приложению!");
+            MessageBox.Show("РЎРїСЂР°РІРєР° РїРѕ РїСЂРёР»РѕР¶РµРЅРёСЋ!");
         }
     }
 }
