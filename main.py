@@ -352,6 +352,108 @@ class AutoPartsApp:
         cancel_button = tk.Button(button_frame, text="Отмена", font=("Arial", 12), bg="#FF5722", fg="#ffffff", command=add_window.destroy)
         cancel_button.pack(side=tk.LEFT, padx=10)
 
+    # Редактирование записи
+    def edit_record(self, tree, table_name):
+        selected_item = tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Внимание", "Выберите запись для редактирования!")
+            return
+
+        # Получаем ID выбранной записи
+        record_id = tree.item(selected_item)['values'][0]
+
+        # Открываем окно для редактирования
+        edit_window = tk.Toplevel(self.root)
+        edit_window.title(f"Редактирование записи ({table_name})")
+        edit_window.geometry("400x300")
+        edit_window.configure(bg="#f9f9f9")
+
+        fields_map = {
+            "parts": ["name", "category", "price", "quantity"],
+            "clients": ["name", "phone"],
+            "cars": ["make", "model", "year"],
+            "suppliers": ["name", "contact"]
+        }
+
+        fields = fields_map.get(table_name, [])
+        entries = []
+
+        input_frame = tk.Frame(edit_window, bg="#f9f9f9")
+        input_frame.pack(pady=10)
+
+        # Загружаем текущие значения записи
+        conn = sqlite3.connect('auto_parts.db')
+        c = conn.cursor()
+        c.execute(f"SELECT * FROM {table_name} WHERE id=?", (record_id,))
+        current_values = c.fetchone()
+        conn.close()
+
+        for i, field in enumerate(fields):
+            label = tk.Label(input_frame, text=self.column_headers[table_name].get(field, field) + ":",
+                             font=("Arial", 12), bg="#f9f9f9")
+            label.grid(row=i, column=0, sticky="w", padx=10, pady=5)
+
+            entry = tk.Entry(input_frame, font=("Arial", 12))
+            entry.grid(row=i, column=1, padx=10, pady=5)
+            entry.insert(0, current_values[i + 1])  # Вставляем текущее значение
+            entries.append(entry)
+
+        def save_changes():
+            new_values = [entry.get() for entry in entries]
+            if any(not value for value in new_values):
+                messagebox.showerror("Ошибка", "Все поля должны быть заполнены!")
+                return
+
+            if not self.validate_data(new_values, table_name):
+                return
+
+            conn = sqlite3.connect('auto_parts.db')
+            c = conn.cursor()
+            update_query = f"UPDATE {table_name} SET " + ", ".join([f"{field}=?" for field in fields]) + " WHERE id=?"
+            c.execute(update_query, (*new_values, record_id))
+            conn.commit()
+            conn.close()
+
+            messagebox.showinfo("Успех", "Запись успешно обновлена!")
+            edit_window.destroy()
+            self.refresh_current_view()
+
+        button_frame = tk.Frame(edit_window, bg="#f9f9f9")
+        button_frame.pack(pady=10)
+
+        save_button = tk.Button(button_frame, text="Сохранить", font=("Arial", 12), bg="#4CAF50", fg="#ffffff",
+                                command=save_changes)
+        save_button.pack(side=tk.LEFT, padx=10)
+
+        cancel_button = tk.Button(button_frame, text="Отмена", font=("Arial", 12), bg="#FF5722", fg="#ffffff",
+                                  command=edit_window.destroy)
+        cancel_button.pack(side=tk.LEFT, padx=10)
+
+    # Удаление записи
+    def delete_record(self, tree, table_name):
+        selected_item = tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Внимание", "Выберите запись для удаления!")
+            return
+
+        # Получаем ID выбранной записи
+        record_id = tree.item(selected_item)['values'][0]
+
+        # Подтверждение удаления
+        confirm = messagebox.askyesno("Подтверждение", "Вы уверены, что хотите удалить эту запись?")
+        if not confirm:
+            return
+
+        # Удаляем запись из базы данных
+        conn = sqlite3.connect('auto_parts.db')
+        c = conn.cursor()
+        c.execute(f"DELETE FROM {table_name} WHERE id=?", (record_id,))
+        conn.commit()
+        conn.close()
+
+        messagebox.showinfo("Успех", "Запись успешно удалена!")
+        self.refresh_current_view()
+
     # Валидация данных
     def validate_data(self, data, table_name):
         if table_name == "parts":
@@ -448,6 +550,18 @@ class AutoPartsApp:
 
     # Импорт данных из Excel
     def import_from_excel(self):
+        # Подсказка для пользователя
+        messagebox.showinfo(
+            "Подсказка",
+            "Убедитесь, что файл Excel содержит следующие заголовки:\n"
+            "- Для таблицы 'parts': Наименование, Категория, Цена, Количество\n"
+            "- Для таблицы 'clients': ФИО, Телефон\n"
+            "- Для таблицы 'cars': Марка, Модель, Год выпуска\n"
+            "- Для таблицы 'suppliers': Название, Контакты\n"
+            "- Для таблицы 'orders': Поставщик, Запчасть, Количество, Дата, Статус\n"
+            "Заголовки должны точно соответствовать указанным."
+        )
+
         # Запрос пути к файлу Excel
         file_path = filedialog.askopenfilename(
             title="Выберите файл Excel",
@@ -458,7 +572,7 @@ class AutoPartsApp:
             return
 
         # Запрос названия таблицы
-        table_name = tk.simpledialog.askstring("Выбор таблицы", "Введите название таблицы (например, parts, clients):")
+        table_name = simpledialog.askstring("Выбор таблицы", "Введите название таблицы (например, parts, clients):")
         if not table_name or table_name not in self.table_name_mapping.values():
             messagebox.showerror("Ошибка", "Неверное название таблицы!")
             return
@@ -637,26 +751,51 @@ class AutoPartsApp:
     # Формирование заказа
     def create_order(self):
         self.clear_main_frame()
-        frame = tk.Frame(self.main_frame, bg="#ffffff", padx=20, pady=20)
+        frame = tk.Frame(self.main_frame, bg="#ffffff", padx=30, pady=30)
         frame.pack(fill=tk.BOTH, expand=True)
 
         label = tk.Label(frame, text="Формирование заказа", font=("Arial", 18, "bold"), bg="#ffffff")
         label.pack(pady=10)
 
+        # Выбор поставщика
         supplier_label = tk.Label(frame, text="Поставщик:", font=("Arial", 12), bg="#ffffff")
         supplier_label.pack()
-        supplier_combo = ttk.Combobox(frame, width=30, font=("Arial", 12))
+        supplier_combo = ttk.Combobox(frame, width=40, font=("Arial", 12))
         supplier_combo.pack()
 
+        # Выбор запчасти
         part_label = tk.Label(frame, text="Запчасть:", font=("Arial", 12), bg="#ffffff")
         part_label.pack()
-        part_combo = ttk.Combobox(frame, width=30, font=("Arial", 12))
+        part_combo = ttk.Combobox(frame, width=40, font=("Arial", 12))
         part_combo.pack()
 
+        # Доступное количество
+        available_quantity_var = tk.StringVar()
+        available_quantity_label = tk.Label(frame, textvariable=available_quantity_var, font=("Arial", 12, "italic"),
+                                            fg="#555555", bg="#ffffff")
+        available_quantity_label.pack()
+
+        # Количество для заказа
         quantity_label = tk.Label(frame, text="Количество:", font=("Arial", 12), bg="#ffffff")
         quantity_label.pack()
         quantity_entry = tk.Entry(frame, font=("Arial", 12))
         quantity_entry.pack()
+
+        def update_available_quantity(event):
+            selected_part_id = part_combo.get().split()[0] if part_combo.get() else None
+            if not selected_part_id:
+                available_quantity_var.set("Доступное количество: Не выбрано")
+                return
+
+            conn = sqlite3.connect('auto_parts.db')
+            c = conn.cursor()
+            c.execute("SELECT quantity FROM parts WHERE id=?", (selected_part_id,))
+            available_quantity = c.fetchone()[0]
+            conn.close()
+
+            available_quantity_var.set(f"Доступное количество: {available_quantity}")
+
+        part_combo.bind("<<ComboboxSelected>>", update_available_quantity)
 
         def validate_quantity():
             try:
@@ -707,7 +846,7 @@ class AutoPartsApp:
             self.show_ref("orders")
 
         save_button = tk.Button(frame, text="Создать заказ", font=("Arial", 12), bg="#4CAF50", fg="#ffffff",
-                                command=save_order)
+                                command=save_order, width=20)
         save_button.pack(pady=10)
 
         # Загрузка данных в Combobox
@@ -796,17 +935,46 @@ class AutoPartsApp:
     # Показать руководство
     def show_manual(self):
         self.clear_main_frame()
-        frame = tk.Frame(self.main_frame, bg="#ffffff", padx=20, pady=20)
+        frame = tk.Frame(self.main_frame, bg="#ffffff", padx=30, pady=30)
         frame.pack(fill=tk.BOTH, expand=True)
 
         label = tk.Label(frame, text="Руководство по использованию", font=("Arial", 18, "bold"), bg="#ffffff")
         label.pack(pady=10)
 
         manual_text = """
-            1. Используйте меню 'Справочники' для просмотра, добавления, редактирования и удаления записей.
-            2. В разделе 'Отчеты' вы можете увидеть информацию о продажах и заказах.
-            3. Для создания заказа используйте пункт меню 'Создать заказ'.
-            """
+        Руководство по использованию программы:
+
+        1. Справочники:
+           - Используйте меню "Справочники" для просмотра, добавления, редактирования и удаления записей.
+           - Доступные справочники: Автозапчасти, Клиенты, Автомобили, Поставщики, Заказы.
+
+        2. Создание заказа:
+           - Перейдите в меню "Создать заказ".
+           - Выберите поставщика и запчасть из выпадающих списков.
+           - Укажите количество для заказа.
+           - Нажмите "Создать заказ". Программа автоматически проверит наличие товара на складе.
+
+        3. Отчеты:
+           - В меню "Отчеты" вы можете просмотреть информацию о продажах и заказах.
+           - Также доступны функции экспорта и импорта данных.
+
+        4. Экспорт в Excel:
+           - Выберите пункт "Экспорт в Excel" в меню "Отчеты".
+           - Укажите название таблицы (например, parts, clients).
+           - Программа создаст файл Excel с данными.
+
+        5. Импорт из Excel:
+           - Выберите пункт "Импорт из Excel" в меню "Справочники".
+           - Укажите путь к файлу Excel и название таблицы.
+           - Программа прочитает данные из файла и добавит их в базу данных.
+           - Подсказка: Убедитесь, что заголовки в файле Excel совпадают с ожидаемыми (например, "Наименование", "Категория").
+
+        6. Очистка таблицы:
+           - При импорте можно очистить таблицу перед добавлением новых данных.
+           - Будьте осторожны: это действие нельзя отменить!
+
+        Для дополнительной помощи обратитесь к разработчику.
+        """
         manual_label = tk.Label(frame, text=manual_text, justify="left", font=("Arial", 12), bg="#ffffff")
         manual_label.pack(pady=10)
 
