@@ -1,991 +1,1097 @@
-import tkinter as tk
-from tkinter import messagebox, ttk, filedialog, simpledialog
 import sqlite3
-import re
-from openpyxl import Workbook
-from openpyxl import load_workbook
+import pandas as pd
+from fpdf import FPDF
+from tkinter import *
+from tkinter import messagebox, ttk, simpledialog
+from datetime import datetime
+
 
 # Создание базы данных и таблиц
 def create_database():
     conn = sqlite3.connect('auto_parts.db')
-    c = conn.cursor()
+    cursor = conn.cursor()
 
-    # Таблица для автозапчастей
-    c.execute('''
+    # Таблица автозапчастей
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS parts (
-            id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             category TEXT NOT NULL,
+            manufacturer TEXT NOT NULL,
+            supplier TEXT NOT NULL,
             price REAL NOT NULL,
             quantity INTEGER NOT NULL
         )
     ''')
 
-    # Таблица для клиентов
-    c.execute('''
+    # Таблица клиентов
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS clients (
-            id INTEGER PRIMARY KEY,
-            name TEXT NOT NULL,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
             phone TEXT NOT NULL
         )
     ''')
 
-    # Таблица для продаж
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS sales (
-            id INTEGER PRIMARY KEY,
-            client_id INTEGER NOT NULL,
-            part_id INTEGER NOT NULL,
-            quantity INTEGER NOT NULL,
-            sale_date TEXT NOT NULL,
-            FOREIGN KEY (client_id) REFERENCES clients(id),
-            FOREIGN KEY (part_id) REFERENCES parts(id)
-        )
-    ''')
-
-    # Таблица для автомобилей
-    c.execute('''
+    # Таблица автомобилей
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS cars (
-            id INTEGER PRIMARY KEY,
-            make TEXT NOT NULL,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand TEXT NOT NULL,
             model TEXT NOT NULL,
             year INTEGER NOT NULL
         )
     ''')
 
-    # Таблица для поставщиков
-    c.execute('''
+    # Таблица поставщиков
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS suppliers (
-            id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
-            contact TEXT NOT NULL
+            phone TEXT NOT NULL
         )
     ''')
 
-    # Таблица для заказов
-    c.execute('''
+    # Таблица заказов
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS orders (
-            id INTEGER PRIMARY KEY,
-            supplier_id INTEGER NOT NULL,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER NOT NULL,
             part_id INTEGER NOT NULL,
             quantity INTEGER NOT NULL,
             order_date TEXT NOT NULL,
-            status TEXT DEFAULT 'В обработке',
-            FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+            status TEXT DEFAULT 'Новый',
+            FOREIGN KEY (client_id) REFERENCES clients(id),
             FOREIGN KEY (part_id) REFERENCES parts(id)
         )
     ''')
 
-    # Проверка наличия колонки `status` в таблице `orders`
-    c.execute("PRAGMA table_info(orders)")
-    columns = [column[1] for column in c.fetchall()]
-    if "status" not in columns:
-        c.execute("ALTER TABLE orders ADD COLUMN status TEXT DEFAULT 'В обработке'")
+    conn.commit()
+    conn.close()
 
-    # Проверка наличия колонки `category` в таблице `parts`
-    c.execute("PRAGMA table_info(parts)")
-    columns = [column[1] for column in c.fetchall()]
-    if "category" not in columns:
-        c.execute("ALTER TABLE parts ADD COLUMN category TEXT DEFAULT 'Общая'")
+
+# Функции для работы с таблицами
+def add_part(name, category, manufacturer, supplier, price, quantity):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO parts (name, category, manufacturer, supplier, price, quantity)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (name, category, manufacturer, supplier, price, quantity))
+    conn.commit()
+    conn.close()
+
+
+def view_parts():
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM parts')
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
+def add_client(full_name, phone):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO clients (full_name, phone)
+        VALUES (?, ?)
+    ''', (full_name, phone))
+    conn.commit()
+    conn.close()
+
+
+def view_clients():
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM clients')
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
+def edit_client(client_id, full_name, phone):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE clients SET full_name = ?, phone = ? WHERE id = ?
+    ''', (full_name, phone, client_id))
+    conn.commit()
+    conn.close()
+
+
+def delete_client(client_id):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM clients WHERE id = ?', (client_id,))
+    conn.commit()
+    conn.close()
+
+
+
+
+def add_car(brand, model, year):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO cars (brand, model, year)
+        VALUES (?, ?, ?)
+    ''', (brand, model, year))
+    conn.commit()
+    conn.close()
+
+
+def view_cars():
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM cars')
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
+def edit_car(car_id, brand, model, year):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE cars SET brand = ?, model = ?, year = ? WHERE id = ?
+    ''', (brand, model, year, car_id))
+    conn.commit()
+    conn.close()
+
+
+def delete_car(car_id):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM cars WHERE id = ?', (car_id,))
+    conn.commit()
+    conn.close()
+
+
+def add_supplier(name, phone):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO suppliers (name, phone)
+        VALUES (?, ?)
+    ''', (name, phone))
+    conn.commit()
+    conn.close()
+
+
+def view_suppliers():
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM suppliers')
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
+def edit_supplier(supplier_id, name, phone):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE suppliers SET name = ?, phone = ? WHERE id = ?
+    ''', (name, phone, supplier_id))
+    conn.commit()
+    conn.close()
+
+
+def delete_supplier(supplier_id):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM suppliers WHERE id = ?', (supplier_id,))
+    conn.commit()
+    conn.close()
+
+
+def add_order(client_id, part_id, quantity, order_date, status="Новый"):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO orders (client_id, part_id, quantity, order_date, status)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (client_id, part_id, quantity, order_date, status))
+    conn.commit()
+    conn.close()
+
+
+def edit_order(order_id, client_id, part_id, quantity, order_date):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE orders SET client_id = ?, part_id = ?, quantity = ?, order_date = ? WHERE id = ?
+    ''', (client_id, part_id, quantity, order_date, order_id))
+    conn.commit()
+    conn.close()
+
+
+def delete_order(order_id):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM orders WHERE id = ?', (order_id,))
+    conn.commit()
+    conn.close()
+
+
+def view_orders_with_status():
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM orders')
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
+def update_order_status(order_id, new_status):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE orders SET status = ? WHERE id = ?
+    ''', (new_status, order_id))
+    conn.commit()
+    conn.close()
+
+
+def select_client():
+    clients = view_clients()
+    if not clients:
+        messagebox.showwarning("Ошибка", "Список клиентов пуст!")
+        return None
+
+    top = Toplevel()
+    top.title("Выбор клиента")
+
+    tree = ttk.Treeview(top, columns=("ID", "ФИО", "Телефон"), show="headings")
+    tree.heading("ID", text="ID")
+    tree.heading("ФИО", text="ФИО")
+    tree.heading("Телефон", text="Телефон")
+    tree.pack(pady=10)
+
+    for client in clients:
+        tree.insert("", END, values=client)
+
+    selected_client_id = None  # Переменная для хранения выбранного ID клиента
+
+    def on_select():
+        nonlocal selected_client_id  # Используем nonlocal для изменения переменной
+        selected_item = tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Ошибка", "Клиент не выбран!")
+            return
+        selected_client_id = tree.item(selected_item[0])['values'][0]
+        top.destroy()
+
+    Button(top, text="Выбрать", command=on_select).pack(pady=5)
+
+    top.wait_window()  # Ожидаем закрытия окна
+    return selected_client_id
+
+
+# Функция выбора автозапчастей
+def select_parts():
+    parts = view_parts()
+    if not parts:
+        messagebox.showwarning("Ошибка", "Список автозапчастей пуст!")
+        return None
+
+    top = Toplevel()
+    top.title("Выбор автозапчастей")
+
+    tree = ttk.Treeview(top, columns=("ID", "Название", "Цена", "Количество"), show="headings")
+    tree.heading("ID", text="ID")
+    tree.heading("Название", text="Название")
+    tree.heading("Цена", text="Цена")
+    tree.heading("Количество", text="Количество")
+    tree.pack(pady=10)
+
+    for part in parts:
+        tree.insert("", END, values=(part[0], part[1], part[5], part[6]))
+
+    selected_parts = []
+
+    def add_part():
+        selected_item = tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Ошибка", "Автозапчасть не выбрана!")
+            return
+        part_id = tree.item(selected_item[0])['values'][0]
+        part_name = tree.item(selected_item[0])['values'][1]
+        part_price = tree.item(selected_item[0])['values'][2]
+        part_quantity = tree.item(selected_item[0])['values'][3]
+
+        quantity = simpledialog.askinteger("Количество", f"Введите количество для {part_name}:")
+        if not quantity or quantity <= 0:
+            messagebox.showwarning("Ошибка", "Некорректное количество!")
+            return
+
+        if quantity > part_quantity:
+            messagebox.showwarning("Ошибка", f"Недостаточно запчастей ({part_quantity} доступно)!")
+            return
+
+        selected_parts.append((part_id, part_name, part_price, quantity))
+        update_cart()
+
+    cart_tree = ttk.Treeview(top, columns=("ID", "Название", "Цена", "Количество"), show="headings")
+    cart_tree.heading("ID", text="ID")
+    cart_tree.heading("Название", text="Название")
+    cart_tree.heading("Цена", text="Цена")
+    cart_tree.heading("Количество", text="Количество")
+    cart_tree.pack(pady=10)
+
+    def update_cart():
+        for i in cart_tree.get_children():
+            cart_tree.delete(i)
+        for part in selected_parts:
+            cart_tree.insert("", END, values=part)
+
+    Button(top, text="Добавить в заказ", command=add_part).pack(side=LEFT, padx=5)
+
+    def confirm_order():
+        if not selected_parts:
+            messagebox.showwarning("Ошибка", "Заказ пуст!")
+            return
+        top.destroy()
+        return selected_parts
+
+    Button(top, text="Подтвердить заказ", command=lambda: confirm_order()).pack(side=LEFT, padx=5)
+
+
+def create_order():
+    client_id = select_client()
+    if not client_id:
+        return  # Если клиент не выбран, выходим из функции
+
+    selected_parts = select_parts()
+    if not selected_parts:
+        return  # Если запчасти не выбраны, выходим из функции
+
+    order_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+
+    total_price = 0
+
+    for part in selected_parts:
+        part_id, _, price, quantity = part
+        cursor.execute('''
+            INSERT INTO orders (client_id, part_id, quantity, order_date, status)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (client_id, part_id, quantity, order_date, "Новый"))
+
+        # Уменьшаем количество на складе
+        cursor.execute('''
+            UPDATE parts SET quantity = quantity - ? WHERE id = ?
+        ''', (quantity, part_id))
+
+        total_price += price * quantity
 
     conn.commit()
     conn.close()
 
-# Главное окно
+    messagebox.showinfo("Успешно", f"Заказ создан! Общая стоимость: {total_price:.2f}")
+
+    # Обновляем таблицу заказов
+    app.update_orders_table()
+
+def get_order_details():
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT 
+            orders.id,
+            clients.full_name AS client_name,
+            parts.name AS part_name,
+            orders.quantity,
+            orders.order_date,
+            orders.status
+        FROM orders
+        JOIN clients ON orders.client_id = clients.id
+        JOIN parts ON orders.part_id = parts.id
+    ''')
+    rows = cursor.fetchall()
+    conn.close()
+
+    # Форматируем дату
+    formatted_rows = []
+    for row in rows:
+        formatted_date = format_order_date(row[4])
+        formatted_rows.append((row[0], row[1], row[2], row[3], formatted_date, row[5]))
+
+    return formatted_rows
+
+
+# Функция редактирования статуса заказа
+def edit_order_status_form(order_id):
+    top = Toplevel()
+    top.title("Изменение статуса заказа")
+
+    current_status = [o[5] for o in view_orders_with_status() if o[0] == order_id][0]
+
+    Label(top, text="Текущий статус:").grid(row=0, column=0)
+    Label(top, text=current_status).grid(row=0, column=1)
+
+    Label(top, text="Новый статус:").grid(row=1, column=0)
+    status_var = StringVar(top)
+    status_var.set(current_status)  # Установка текущего статуса как значения по умолчанию
+    status_options = ["Новый", "В обработке", "Выполнен", "Отменён"]
+    status_menu = OptionMenu(top, status_var, *status_options)
+    status_menu.grid(row=1, column=1)
+
+    def save_status():
+        new_status = status_var.get()
+        update_order_status(order_id, new_status)
+        messagebox.showinfo("Успешно", f"Статус заказа {order_id} изменен на '{new_status}'!")
+        top.destroy()
+
+    Button(top, text="Сохранить", command=save_status).grid(row=2, column=0, columnspan=2)
+
+
+def format_order_date(order_date):
+    try:
+        return datetime.strptime(order_date, "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y %H:%M")
+    except ValueError:
+        return order_date
+
+
+def add_status_column_to_orders():
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute('ALTER TABLE orders ADD COLUMN status TEXT DEFAULT "Новый"')
+        conn.commit()
+        print("Столбец 'status' успешно добавлен в таблицу 'orders'.")
+    except sqlite3.OperationalError as e:
+        print(f"Ошибка при добавлении столбца: {e}")
+    finally:
+        conn.close()
+
+
+import sqlite3
+from tkinter import *
+from tkinter import messagebox, ttk, simpledialog
+from datetime import datetime
+
+
+# Создание базы данных и таблиц
+def create_database():
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+
+    # Таблица автозапчастей
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS parts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            manufacturer TEXT NOT NULL,
+            supplier TEXT NOT NULL,
+            price REAL NOT NULL,
+            quantity INTEGER NOT NULL
+        )
+    ''')
+
+    # Таблица клиентов
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS clients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            phone TEXT NOT NULL
+        )
+    ''')
+
+    # Таблица заказов
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER NOT NULL,
+            part_id INTEGER NOT NULL,
+            quantity INTEGER NOT NULL,
+            order_date TEXT NOT NULL,
+            status TEXT DEFAULT 'Новый',
+            FOREIGN KEY (client_id) REFERENCES clients(id),
+            FOREIGN KEY (part_id) REFERENCES parts(id)
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+
+
+# Функции для работы с таблицами
+def add_part(name, category, manufacturer, supplier, price, quantity):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO parts (name, category, manufacturer, supplier, price, quantity)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (name, category, manufacturer, supplier, price, quantity))
+    conn.commit()
+    conn.close()
+
+
+def view_parts():
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM parts')
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
+def add_client(full_name, phone):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO clients (full_name, phone)
+        VALUES (?, ?)
+    ''', (full_name, phone))
+    conn.commit()
+    conn.close()
+
+
+def view_clients():
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM clients')
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
+def add_order(client_id, part_id, quantity, order_date, status="Новый"):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO orders (client_id, part_id, quantity, order_date, status)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (client_id, part_id, quantity, order_date, status))
+    conn.commit()
+    conn.close()
+
+
+def get_order_details():
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT 
+            orders.id,
+            clients.full_name AS client_name,
+            parts.name AS part_name,
+            orders.quantity,
+            orders.order_date,
+            orders.status
+        FROM orders
+        JOIN clients ON orders.client_id = clients.id
+        JOIN parts ON orders.part_id = parts.id
+    ''')
+    rows = cursor.fetchall()
+    conn.close()
+
+    # Форматируем дату
+    formatted_rows = []
+    for row in rows:
+        formatted_date = format_order_date(row[4])
+        formatted_rows.append((row[0], row[1], row[2], row[3], formatted_date, row[5]))
+
+    return formatted_rows
+
+
+def update_order_status(order_id, new_status):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE orders SET status = ? WHERE id = ?
+    ''', (new_status, order_id))
+    conn.commit()
+    conn.close()
+
+
+def format_order_date(order_date):
+    try:
+        return datetime.strptime(order_date, "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y %H:%M")
+    except ValueError:
+        return order_date
+
+
+# Функция выбора клиента
+def select_client():
+    clients = view_clients()
+    if not clients:
+        messagebox.showwarning("Ошибка", "Список клиентов пуст!")
+        return None
+
+    top = Toplevel()
+    top.title("Выбор клиента")
+
+    tree = ttk.Treeview(top, columns=("ID", "ФИО", "Телефон"), show="headings")
+    tree.heading("ID", text="ID")
+    tree.heading("ФИО", text="ФИО")
+    tree.heading("Телефон", text="Телефон")
+    tree.pack(pady=10)
+
+    for client in clients:
+        tree.insert("", END, values=client)
+
+    selected_client_id = None  # Переменная для хранения выбранного ID клиента
+
+    def on_select():
+        nonlocal selected_client_id
+        selected_item = tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Ошибка", "Клиент не выбран!")
+            return
+        selected_client_id = tree.item(selected_item[0])['values'][0]
+        top.destroy()
+
+    Button(top, text="Выбрать", command=on_select).pack(pady=5)
+
+    top.wait_window()  # Ожидаем закрытия окна
+    return selected_client_id
+
+
+# Функция выбора автозапчастей
+def select_parts():
+    parts = view_parts()
+    if not parts:
+        messagebox.showwarning("Ошибка", "Список автозапчастей пуст!")
+        return None
+
+    top = Toplevel()
+    top.title("Выбор автозапчастей")
+
+    tree = ttk.Treeview(top, columns=("ID", "Название", "Цена", "Количество"), show="headings")
+    tree.heading("ID", text="ID")
+    tree.heading("Название", text="Название")
+    tree.heading("Цена", text="Цена")
+    tree.heading("Количество", text="Количество")
+    tree.pack(pady=10)
+
+    for part in parts:
+        tree.insert("", END, values=(part[0], part[1], part[5], part[6]))
+
+    selected_parts = []
+
+    def add_part():
+        selected_item = tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Ошибка", "Автозапчасть не выбрана!")
+            return
+        part_id = tree.item(selected_item[0])['values'][0]
+        part_name = tree.item(selected_item[0])['values'][1]
+        part_price = tree.item(selected_item[0])['values'][2]
+        part_quantity = tree.item(selected_item[0])['values'][3]
+
+        quantity = simpledialog.askinteger("Количество", f"Введите количество для {part_name}:")
+        if not quantity or quantity <= 0:
+            messagebox.showwarning("Ошибка", "Некорректное количество!")
+            return
+
+        if quantity > part_quantity:
+            messagebox.showwarning("Ошибка", f"Недостаточно запчастей ({part_quantity} доступно)!")
+            return
+
+        selected_parts.append((part_id, part_name, part_price, quantity))
+        update_cart()
+
+    cart_tree = ttk.Treeview(top, columns=("ID", "Название", "Цена", "Количество"), show="headings")
+    cart_tree.heading("ID", text="ID")
+    cart_tree.heading("Название", text="Название")
+    cart_tree.heading("Цена", text="Цена")
+    cart_tree.heading("Количество", text="Количество")
+    cart_tree.pack(pady=10)
+
+    def update_cart():
+        for i in cart_tree.get_children():
+            cart_tree.delete(i)
+        for part in selected_parts:
+            cart_tree.insert("", END, values=part)
+
+    Button(top, text="Добавить в заказ", command=add_part).pack(side=LEFT, padx=5)
+
+    def confirm_order():
+        if not selected_parts:
+            messagebox.showwarning("Ошибка", "Заказ пуст!")
+            return
+        top.destroy()
+        return selected_parts
+
+    Button(top, text="Подтвердить заказ", command=lambda: confirm_order()).pack(side=LEFT, padx=5)
+
+
+# Функция создания заказа
+def create_order():
+    client_id = select_client()
+    if not client_id:
+        return
+
+    selected_parts = select_parts()
+    if not selected_parts:
+        return
+
+    order_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+
+    total_price = 0
+
+    for part in selected_parts:
+        part_id, _, price, quantity = part
+        cursor.execute('''
+            INSERT INTO orders (client_id, part_id, quantity, order_date, status)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (client_id, part_id, quantity, order_date, "Новый"))
+
+        # Уменьшаем количество на складе
+        cursor.execute('''
+            UPDATE parts SET quantity = quantity - ? WHERE id = ?
+        ''', (quantity, part_id))
+
+        total_price += price * quantity
+
+    conn.commit()
+    conn.close()
+
+    messagebox.showinfo("Успешно", f"Заказ создан! Общая стоимость: {total_price:.2f}")
+
+    # Обновляем таблицу заказов
+    app.update_orders_table()
+
+
+# GUI для управления программой
 class AutoPartsApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("АРМ Продавца Автозапчастей")
-        self.root.geometry("1000x600")
-        self.root.configure(bg="#f9f9f9")
+        self.root.title("Автоматизированное рабочее место продавца автозапчастей")
 
-        # Маппинг между русскими названиями и именами таблиц
-        self.table_name_mapping = {
-            "автозапчастей": "parts",
-            "клиентов": "clients",
-            "автомобилей": "cars",
-            "поставщиков": "suppliers",
-            "заказов": "orders"
-        }
+        # Меню
+        menu = Menu(root)
+        root.config(menu=menu)
 
-        # Маппинг между английскими названиями колонок и русскими заголовками
-        self.column_headers = {
-            "parts": {
-                "ID": "ID",
-                "name": "Наименование",
-                "category": "Категория",
-                "price": "Цена",
-                "quantity": "Количество"
-            },
-            "clients": {
-                "ID": "ID",
-                "name": "ФИО",
-                "phone": "Телефон"
-            },
-            "cars": {
-                "ID": "ID",
-                "make": "Марка",
-                "model": "Модель",
-                "year": "Год выпуска"
-            },
-            "suppliers": {
-                "ID": "ID",
-                "name": "Название",
-                "contact": "Контакты"
-            },
-            "orders": {
-                "ID": "ID",
-                "Supplier": "Поставщик",
-                "Part": "Запчасть",
-                "Quantity": "Количество",
-                "Date": "Дата",
-                "Status": "Статус"
-            }
-        }
+        reference_menu = Menu(menu, tearoff=0)
+        menu.add_cascade(label="Справочники", menu=reference_menu)
+        reference_menu.add_command(label="Клиенты", command=lambda: self.show_reference("clients"))
+        reference_menu.add_command(label="Заказы", command=self.show_orders)
 
-        # Закрепленная верхняя панель
-        self.create_menu()
+        file_menu = Menu(menu, tearoff=0)
+        menu.add_cascade(label="Файл", menu=file_menu)
+        file_menu.add_command(label="Выход", command=root.quit)
 
-        # Основной контейнер для отображения содержимого
-        self.main_frame = tk.Frame(self.root, bg="#ffffff", padx=20, pady=20)
-        self.main_frame.pack(fill=tk.BOTH, expand=True)
+        # Главный фрейм для таблицы автозапчастей
+        main_frame = Frame(root)
+        main_frame.pack(pady=10)
 
-        # Начальный фрейм
-        self.start_frame = tk.Frame(self.main_frame, bg="#ffffff", padx=20, pady=20)
-        self.start_frame.pack(fill=tk.BOTH, expand=True)
+        Label(main_frame, text="Таблица автозапчастей").pack()
 
-        label = tk.Label(self.start_frame, text="Добро пожаловать в АРМ Продавца Автозапчастей!", font=("Arial", 20, "bold"), bg="#ffffff")
-        label.pack(pady=50)
+        # Список автозапчастей
+        self.parts_tree = ttk.Treeview(main_frame, columns=("ID", "Name", "Category", "Manufacturer", "Supplier", "Price", "Quantity"), show="headings")
+        self.parts_tree.pack(pady=10)
+        self.parts_tree.heading("ID", text="ID")
+        self.parts_tree.heading("Name", text="Название")
+        self.parts_tree.heading("Category", text="Категория")
+        self.parts_tree.heading("Manufacturer", text="Производитель")
+        self.parts_tree.heading("Supplier", text="Поставщик")
+        self.parts_tree.heading("Price", text="Цена")
+        self.parts_tree.heading("Quantity", text="Количество")
+        self.update_parts_list()
 
-    # Создание закрепленного меню
-    def create_menu(self):
-        menu_bar = tk.Menu(self.root, bg="#ffffff", fg="#333333", activebackground="#4CAF50",
-                           activeforeground="#ffffff")
-        self.root.config(menu=menu_bar)
+        Button(main_frame, text="Добавить", command=self.add_part_form).pack(side=LEFT, padx=5)
+        Button(main_frame, text="Редактировать", command=self.edit_part).pack(side=LEFT, padx=5)
+        Button(main_frame, text="Удалить", command=self.delete_part).pack(side=LEFT, padx=5)
+        Button(main_frame, text="Создать заказ", command=create_order).pack(side=LEFT, padx=5)
 
-        # Справочники
-        ref_menu = tk.Menu(menu_bar, tearoff=0, bg="#ffffff", fg="#333333", activebackground="#4CAF50",
-                           activeforeground="#ffffff")
-        ref_menu.add_command(label="Автозапчасти", command=lambda: self.show_ref("parts"))
-        ref_menu.add_command(label="Клиенты", command=lambda: self.show_ref("clients"))
-        ref_menu.add_command(label="Автомобили", command=lambda: self.show_ref("cars"))
-        ref_menu.add_command(label="Поставщики", command=lambda: self.show_ref("suppliers"))
-        ref_menu.add_command(label="Заказы", command=lambda: self.show_ref("orders"))
-        ref_menu.add_command(label="Импорт из Excel", command=self.import_from_excel)  # Новый пункт
-        menu_bar.add_cascade(label="Справочники", menu=ref_menu)
+        # Таблица заказов
+        self.orders_tree = None
 
-        # Отчеты
-        report_menu = tk.Menu(menu_bar, tearoff=0, bg="#ffffff", fg="#333333", activebackground="#4CAF50",
-                              activeforeground="#ffffff")
-        report_menu.add_command(label="Продажи", command=self.show_sales_report)
-        report_menu.add_command(label="Заказы", command=self.show_orders_report)
-        report_menu.add_command(label="Экспорт в Excel", command=self.export_to_excel)
-        menu_bar.add_cascade(label="Отчеты", menu=report_menu)
+    def update_parts_list(self):
+        for i in self.parts_tree.get_children():
+            self.parts_tree.delete(i)
+        parts = view_parts()
+        for part in parts:
+            self.parts_tree.insert("", END, values=part)
 
-        # Формирование заказа
-        menu_bar.add_command(label="Создать заказ", command=self.create_order, background="#4CAF50",
-                             foreground="#ffffff", activebackground="#388E3C", activeforeground="#ffffff")
+    def add_part_form(self):
+        top = Toplevel(self.root)
+        top.title("Добавить автозапчасть")
 
-        # Руководство
-        menu_bar.add_command(label="Руководство", command=self.show_manual, background="#FF9800", foreground="#ffffff",
-                             activebackground="#F57C00", activeforeground="#ffffff")
+        Label(top, text="Название:").grid(row=0, column=0)
+        name_entry = Entry(top)
+        name_entry.grid(row=0, column=1)
 
-    # Показать справочник
-    def show_ref(self, table_name):
-        self.clear_main_frame()
+        Label(top, text="Категория:").grid(row=1, column=0)
+        category_entry = Entry(top)
+        category_entry.grid(row=1, column=1)
 
-        frame = tk.Frame(self.main_frame, bg="#ffffff", padx=20, pady=20)
-        frame.pack(fill=tk.BOTH, expand=True)
+        Label(top, text="Производитель:").grid(row=2, column=0)
+        manufacturer_entry = Entry(top)
+        manufacturer_entry.grid(row=2, column=1)
 
-        title_map = {
-            "parts": "Справочник автозапчастей",
-            "clients": "Справочник клиентов",
-            "cars": "Справочник автомобилей",
-            "suppliers": "Справочник поставщиков",
-            "orders": "Список заказов"
-        }
+        Label(top, text="Поставщик:").grid(row=3, column=0)
+        supplier_entry = Entry(top)
+        supplier_entry.grid(row=3, column=1)
 
-        label = tk.Label(frame, text=title_map.get(table_name, ""), font=("Arial", 18, "bold"), bg="#ffffff")
-        label.pack(pady=10)
+        Label(top, text="Цена:").grid(row=4, column=0)
+        price_entry = Entry(top)
+        price_entry.grid(row=4, column=1)
 
-        tree = self.create_treeview(frame, table_name)
-        self.load_data(tree, table_name)
+        Label(top, text="Количество:").grid(row=5, column=0)
+        quantity_entry = Entry(top)
+        quantity_entry.grid(row=5, column=1)
 
-        if table_name == "orders":
-            # Кнопка для обновления статуса
-            button_frame = tk.Frame(frame, bg="#ffffff")
-            button_frame.pack(pady=10)
+        Button(top, text="Сохранить", command=lambda: self.save_part(name_entry.get(), category_entry.get(), manufacturer_entry.get(), supplier_entry.get(), price_entry.get(), quantity_entry.get(), top)).grid(row=6, column=0, columnspan=2)
 
-            update_status_button = tk.Button(button_frame, text="Обновить статус", font=("Arial", 12), bg="#FFC107", fg="#ffffff", command=lambda: self.update_order_status(tree))
-            update_status_button.pack(side=tk.LEFT, padx=10)
+    def save_part(self, name, category, manufacturer, supplier, price, quantity, window):
+        add_part(name, category, manufacturer, supplier, float(price), int(quantity))
+        messagebox.showinfo("Успешно", "Автозапчасть добавлена!")
+        window.destroy()
+        self.update_parts_list()
 
-            # Кнопка для редактирования заказа
-            edit_order_button = tk.Button(button_frame, text="Редактировать", font=("Arial", 12), bg="#2196F3", fg="#ffffff", command=lambda: self.edit_order(tree))
-            edit_order_button.pack(side=tk.LEFT, padx=10)
+    def edit_part(self):
+        selected_item = self.parts_tree.selection()[0]
+        part_id = self.parts_tree.item(selected_item)['values'][0]
 
-        elif table_name != "orders":
-            # Кнопки для добавления, редактирования и удаления
-            button_frame = tk.Frame(frame, bg="#ffffff")
-            button_frame.pack(pady=10)
+        self.edit_part_form(part_id)
 
-            add_button = tk.Button(button_frame, text="Добавить", font=("Arial", 12), bg="#4CAF50", fg="#ffffff", command=lambda: self.add_record(table_name))
-            add_button.pack(side=tk.LEFT, padx=10)
+    def edit_part_form(self, part_id):
+        top = Toplevel(self.root)
+        top.title("Редактировать автозапчасть")
 
-            edit_button = tk.Button(button_frame, text="Редактировать", font=("Arial", 12), bg="#2196F3", fg="#ffffff", command=lambda: self.edit_record(tree, table_name))
-            edit_button.pack(side=tk.LEFT, padx=10)
+        part = [p for p in view_parts() if p[0] == part_id][0]
 
-            delete_button = tk.Button(button_frame, text="Удалить", font=("Arial", 12), bg="#FF5722", fg="#ffffff", command=lambda: self.delete_record(tree, table_name))
-            delete_button.pack(side=tk.LEFT, padx=10)
+        Label(top, text="Название:").grid(row=0, column=0)
+        name_entry = Entry(top)
+        name_entry.insert(0, part[1])
+        name_entry.grid(row=0, column=1)
 
-    # Создание Treeview для справочников
-    def create_treeview(self, frame, table_name):
-        columns_map = {
-            "parts": ("ID", "name", "category", "price", "quantity"),
-            "clients": ("ID", "name", "phone"),
-            "cars": ("ID", "make", "model", "year"),
-            "suppliers": ("ID", "name", "contact"),
-            "orders": ("ID", "Supplier", "Part", "Quantity", "Date", "Status")
-        }
+        Label(top, text="Категория:").grid(row=1, column=0)
+        category_entry = Entry(top)
+        category_entry.insert(0, part[2])
+        category_entry.grid(row=1, column=1)
 
-        # Получаем список колонок для текущей таблицы
-        columns = columns_map.get(table_name, ())
-        tree = ttk.Treeview(frame, columns=columns, show="headings", height=15, style="Custom.Treeview")
+        Label(top, text="Производитель:").grid(row=2, column=0)
+        manufacturer_entry = Entry(top)
+        manufacturer_entry.insert(0, part[3])
+        manufacturer_entry.grid(row=2, column=1)
 
-        # Устанавливаем русские заголовки
-        for col in columns:
-            russian_header = self.column_headers[table_name].get(col, col)
-            tree.heading(col, text=russian_header)
-            tree.column(col, width=150)
+        Label(top, text="Поставщик:").grid(row=3, column=0)
+        supplier_entry = Entry(top)
+        supplier_entry.insert(0, part[4])
+        supplier_entry.grid(row=3, column=1)
 
-        tree.pack(fill=tk.BOTH, expand=True)
+        Label(top, text="Цена:").grid(row=4, column=0)
+        price_entry = Entry(top)
+        price_entry.insert(0, part[5])
+        price_entry.grid(row=4, column=1)
 
-        # Чередование цветов строк
-        tree.tag_configure("oddrow", background="#f0f0f0")
-        tree.tag_configure("evenrow", background="#ffffff")
+        Label(top, text="Количество:").grid(row=5, column=0)
+        quantity_entry = Entry(top)
+        quantity_entry.insert(0, part[6])
+        quantity_entry.grid(row=5, column=1)
 
-        return tree
+        Button(top, text="Сохранить",
+               command=lambda: self.update_part(part_id, name_entry.get(), category_entry.get(),
+                                                manufacturer_entry.get(), supplier_entry.get(), price_entry.get(),
+                                                quantity_entry.get(), top)).grid(row=6, column=0, columnspan=2)
 
-    # Загрузка данных в Treeview
-    def load_data(self, tree, table_name):
-        tree.delete(*tree.get_children())
+    def update_part(self, part_id, name, category, manufacturer, supplier, price, quantity, window):
         conn = sqlite3.connect('auto_parts.db')
-        c = conn.cursor()
-
-        if table_name == "orders":
-            c.execute("""
-                SELECT orders.id, suppliers.name, parts.name, orders.quantity, orders.order_date, orders.status
-                FROM orders
-                INNER JOIN suppliers ON orders.supplier_id = suppliers.id
-                INNER JOIN parts ON orders.part_id = parts.id
-            """)
-        else:
-            c.execute(f"SELECT * FROM {table_name}")
-
-        rows = c.fetchall()
-        for i, row in enumerate(rows):
-            tag = "oddrow" if i % 2 == 0 else "evenrow"
-            tree.insert("", tk.END, values=row, tags=(tag,))
-        conn.close()
-
-    # Добавление новой записи
-    def add_record(self, table_name):
-        add_window = tk.Toplevel(self.root)
-        add_window.title(f"Добавление записи ({table_name})")
-        add_window.geometry("400x300")
-        add_window.configure(bg="#f9f9f9")
-
-        fields_map = {
-            "parts": ["name", "category", "price", "quantity"],
-            "clients": ["name", "phone"],
-            "cars": ["make", "model", "year"],
-            "suppliers": ["name", "contact"]
-        }
-
-        fields = fields_map.get(table_name, [])
-        entries = []
-
-        input_frame = tk.Frame(add_window, bg="#f9f9f9")
-        input_frame.pack(pady=10)
-
-        for i, field in enumerate(fields):
-            label = tk.Label(input_frame, text=self.column_headers[table_name].get(field, field) + ":", font=("Arial", 12), bg="#f9f9f9")
-            label.grid(row=i, column=0, sticky="w", padx=10, pady=5)
-
-            if field == "category":
-                category_var = tk.StringVar()
-                category_combo = ttk.Combobox(input_frame, textvariable=category_var, values=["Двигатель", "Тормозная система", "Электрика"], font=("Arial", 12))
-                category_combo.grid(row=i, column=1, padx=10, pady=5)
-                entries.append(category_var)
-            else:
-                entry = tk.Entry(input_frame, font=("Arial", 12))
-                entry.grid(row=i, column=1, padx=10, pady=5)
-                entries.append(entry)
-
-        def save_record():
-            new_values = [entry.get() if isinstance(entry, tk.Entry) else entry.get() for entry in entries]
-            print("Введенные данные:", new_values)  # Отладочное сообщение
-
-            if any(not value for value in new_values):
-                messagebox.showerror("Ошибка", "Все поля должны быть заполнены!")
-                return
-
-            if not self.validate_data(new_values, table_name):
-                return
-
-            conn = sqlite3.connect('auto_parts.db')
-            c = conn.cursor()
-            insert_query = f"INSERT INTO {table_name} (" + ", ".join(fields) + ") VALUES (" + ", ".join(["?"] * len(fields)) + ")"
-            c.execute(insert_query, new_values)
-            conn.commit()
-            conn.close()
-
-            messagebox.showinfo("Успех", "Запись успешно добавлена!")
-            add_window.destroy()
-            self.refresh_current_view()
-
-        button_frame = tk.Frame(add_window, bg="#f9f9f9")
-        button_frame.pack(pady=10)
-
-        save_button = tk.Button(button_frame, text="Сохранить", font=("Arial", 12), bg="#4CAF50", fg="#ffffff", command=save_record)
-        save_button.pack(side=tk.LEFT, padx=10)
-
-        cancel_button = tk.Button(button_frame, text="Отмена", font=("Arial", 12), bg="#FF5722", fg="#ffffff", command=add_window.destroy)
-        cancel_button.pack(side=tk.LEFT, padx=10)
-
-    # Редактирование записи
-    def edit_record(self, tree, table_name):
-        selected_item = tree.selection()
-        if not selected_item:
-            messagebox.showwarning("Внимание", "Выберите запись для редактирования!")
-            return
-
-        # Получаем ID выбранной записи
-        record_id = tree.item(selected_item)['values'][0]
-
-        # Открываем окно для редактирования
-        edit_window = tk.Toplevel(self.root)
-        edit_window.title(f"Редактирование записи ({table_name})")
-        edit_window.geometry("400x300")
-        edit_window.configure(bg="#f9f9f9")
-
-        fields_map = {
-            "parts": ["name", "category", "price", "quantity"],
-            "clients": ["name", "phone"],
-            "cars": ["make", "model", "year"],
-            "suppliers": ["name", "contact"]
-        }
-
-        fields = fields_map.get(table_name, [])
-        entries = []
-
-        input_frame = tk.Frame(edit_window, bg="#f9f9f9")
-        input_frame.pack(pady=10)
-
-        # Загружаем текущие значения записи
-        conn = sqlite3.connect('auto_parts.db')
-        c = conn.cursor()
-        c.execute(f"SELECT * FROM {table_name} WHERE id=?", (record_id,))
-        current_values = c.fetchone()
-        conn.close()
-
-        for i, field in enumerate(fields):
-            label = tk.Label(input_frame, text=self.column_headers[table_name].get(field, field) + ":",
-                             font=("Arial", 12), bg="#f9f9f9")
-            label.grid(row=i, column=0, sticky="w", padx=10, pady=5)
-
-            entry = tk.Entry(input_frame, font=("Arial", 12))
-            entry.grid(row=i, column=1, padx=10, pady=5)
-            entry.insert(0, current_values[i + 1])  # Вставляем текущее значение
-            entries.append(entry)
-
-        def save_changes():
-            new_values = [entry.get() for entry in entries]
-            if any(not value for value in new_values):
-                messagebox.showerror("Ошибка", "Все поля должны быть заполнены!")
-                return
-
-            if not self.validate_data(new_values, table_name):
-                return
-
-            conn = sqlite3.connect('auto_parts.db')
-            c = conn.cursor()
-            update_query = f"UPDATE {table_name} SET " + ", ".join([f"{field}=?" for field in fields]) + " WHERE id=?"
-            c.execute(update_query, (*new_values, record_id))
-            conn.commit()
-            conn.close()
-
-            messagebox.showinfo("Успех", "Запись успешно обновлена!")
-            edit_window.destroy()
-            self.refresh_current_view()
-
-        button_frame = tk.Frame(edit_window, bg="#f9f9f9")
-        button_frame.pack(pady=10)
-
-        save_button = tk.Button(button_frame, text="Сохранить", font=("Arial", 12), bg="#4CAF50", fg="#ffffff",
-                                command=save_changes)
-        save_button.pack(side=tk.LEFT, padx=10)
-
-        cancel_button = tk.Button(button_frame, text="Отмена", font=("Arial", 12), bg="#FF5722", fg="#ffffff",
-                                  command=edit_window.destroy)
-        cancel_button.pack(side=tk.LEFT, padx=10)
-
-    # Удаление записи
-    def delete_record(self, tree, table_name):
-        selected_item = tree.selection()
-        if not selected_item:
-            messagebox.showwarning("Внимание", "Выберите запись для удаления!")
-            return
-
-        # Получаем ID выбранной записи
-        record_id = tree.item(selected_item)['values'][0]
-
-        # Подтверждение удаления
-        confirm = messagebox.askyesno("Подтверждение", "Вы уверены, что хотите удалить эту запись?")
-        if not confirm:
-            return
-
-        # Удаляем запись из базы данных
-        conn = sqlite3.connect('auto_parts.db')
-        c = conn.cursor()
-        c.execute(f"DELETE FROM {table_name} WHERE id=?", (record_id,))
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE parts SET name = ?, category = ?, manufacturer = ?, supplier = ?, price = ?, quantity = ? WHERE id = ?
+        ''', (name, category, manufacturer, supplier, float(price), int(quantity), part_id))
         conn.commit()
         conn.close()
 
-        messagebox.showinfo("Успех", "Запись успешно удалена!")
-        self.refresh_current_view()
+        messagebox.showinfo("Успешно", "Автозапчасть обновлена!")
+        window.destroy()
+        self.update_parts_list()
 
-    # Валидация данных
-    def validate_data(self, data, table_name):
-        if table_name == "parts":
-            try:
-                float(data[2])  # Цена
-                int(data[3])    # Количество
-            except ValueError:
-                messagebox.showerror("Ошибка", "Цена должна быть числом, количество — целым числом!")
-                return False
-        elif table_name == "clients":
-            if not re.match(r"^\+?\d{10,15}$", data[1]):
-                messagebox.showerror("Ошибка", "Неверный формат телефона!")
-                return False
-        elif table_name == "cars":
-            try:
-                int(data[2])  # Год выпуска
-            except ValueError:
-                messagebox.showerror("Ошибка", "Год должен быть целым числом!")
-                return False
-        return True
+    def delete_part(self):
+        selected_item = self.parts_tree.selection()[0]
+        part_id = self.parts_tree.item(selected_item)['values'][0]
 
-    # Экспорт данных в Excel
-    def export_to_excel(self):
-        # Выбор таблицы для экспорта
-        table_name = "parts"  # Можно сделать выбор через диалоговое окно
-
-        # Подключение к базе данных
         conn = sqlite3.connect('auto_parts.db')
-        c = conn.cursor()
-
-        # Загрузка данных из таблицы
-        c.execute(f"SELECT * FROM {table_name}")
-        rows = c.fetchall()
-
-        # Получение заголовков колонок
-        headers = list(self.column_headers[table_name].values())
-
-        # Создание новой книги Excel
-        wb = Workbook()
-        ws = wb.active
-        ws.title = table_name.capitalize()  # Название листа
-
-        # Запись заголовков
-        ws.append(headers)
-
-        # Запись данных
-        for row in rows:
-            ws.append(row)
-
-        # Сохранение файла
-        file_path = f"{table_name}.xlsx"
-        wb.save(file_path)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM parts WHERE id = ?', (part_id,))
+        conn.commit()
         conn.close()
 
-        messagebox.showinfo("Успех", f"Данные успешно экспортированы в файл: {file_path}")
+        messagebox.showinfo("Успешно", f"Автозапчасть {part_id} удалена!")
+        self.parts_tree.delete(selected_item)
 
-    # Экспорт данных в Excel с выбором таблицы
-    def export_to_excel(self):
-        # Диалоговое окно для выбора таблицы
-        table_name = tk.simpledialog.askstring("Выбор таблицы", "Введите название таблицы (например, parts, clients):")
-        if not table_name or table_name not in self.table_name_mapping.values():
-            messagebox.showerror("Ошибка", "Неверное название таблицы!")
-            return
+    def show_orders(self):
+        top = Toplevel(self.root)
+        top.title("Заказы")
 
-        # Подключение к базе данных
-        conn = sqlite3.connect('auto_parts.db')
-        c = conn.cursor()
+        # Фильтр по статусу
+        Label(top, text="Фильтр по статусу:").grid(row=0, column=0)
+        status_var = StringVar(top)
+        status_var.set("Все")  # Значение по умолчанию
+        status_options = ["Все", "Новый", "В обработке", "Выполнен", "Отменён"]
+        status_menu = OptionMenu(top, status_var, *status_options)
+        status_menu.grid(row=0, column=1)
 
-        # Загрузка данных из таблицы
-        c.execute(f"SELECT * FROM {table_name}")
-        rows = c.fetchall()
+        def filter_orders():
+            selected_status = status_var.get()
+            if selected_status == "Все":
+                data = get_order_details()
+            else:
+                data = [order for order in get_order_details() if order[5] == selected_status]
+            self.update_orders_table_with_data(data)
 
-        # Получение заголовков колонок
-        headers = list(self.column_headers[table_name].values())
+        Button(top, text="Применить фильтр", command=filter_orders).grid(row=0, column=2, padx=5)
 
-        # Создание новой книги Excel
-        wb = Workbook()
-        ws = wb.active
-        ws.title = table_name.capitalize()  # Название листа
+        # Таблица заказов
+        columns = ["ID", "Клиент", "Запчасть", "Количество", "Дата заказа", "Статус"]
+        self.orders_tree = ttk.Treeview(top, columns=columns, show="headings")
+        for col in columns:
+            self.orders_tree.heading(col, text=col)
+        self.orders_tree.grid(row=1, column=0, columnspan=3, pady=10)
 
-        # Запись заголовков
-        ws.append(headers)
+        # Инициализация таблицы
+        self.update_orders_table()
 
-        # Запись данных
-        for row in rows:
-            ws.append(row)
+        # Кнопки управления заказами
+        Button(top, text="Изменить статус", command=lambda: self.change_order_status(self.orders_tree)).grid(row=2,
+                                                                                                             column=0,
+                                                                                                             pady=5)
+        Button(top, text="Редактировать", command=lambda: self.edit_record(self.orders_tree, "orders")).grid(row=2,
+                                                                                                             column=1,
+                                                                                                             pady=5)
+        Button(top, text="Удалить", command=lambda: self.delete_record(self.orders_tree, "orders")).grid(row=2,
+                                                                                                         column=2,
+                                                                                                         pady=5)
 
-        # Сохранение файла
-        file_path = f"{table_name}.xlsx"
-        wb.save(file_path)
-        conn.close()
+    def update_orders_table(self):
+        if self.orders_tree:
+            for i in self.orders_tree.get_children():
+                self.orders_tree.delete(i)
+            data = get_order_details()
+            for row in data:
+                self.orders_tree.insert("", END, values=row)
 
-        messagebox.showinfo("Успех", f"Данные успешно экспортированы в файл: {file_path}")
+    def update_orders_table_with_data(self, data):
+        if self.orders_tree:
+            for i in self.orders_tree.get_children():
+                self.orders_tree.delete(i)
+            for row in data:
+                self.orders_tree.insert("", END, values=row)
 
-    # Импорт данных из Excel
-    def import_from_excel(self):
-        # Подсказка для пользователя
-        messagebox.showinfo(
-            "Подсказка",
-            "Убедитесь, что файл Excel содержит следующие заголовки:\n"
-            "- Для таблицы 'parts': Наименование, Категория, Цена, Количество\n"
-            "- Для таблицы 'clients': ФИО, Телефон\n"
-            "- Для таблицы 'cars': Марка, Модель, Год выпуска\n"
-            "- Для таблицы 'suppliers': Название, Контакты\n"
-            "- Для таблицы 'orders': Поставщик, Запчасть, Количество, Дата, Статус\n"
-            "Заголовки должны точно соответствовать указанным."
-        )
-
-        # Запрос пути к файлу Excel
-        file_path = filedialog.askopenfilename(
-            title="Выберите файл Excel",
-            filetypes=[("Excel files", "*.xlsx *.xls")]
-        )
-        if not file_path:
-            messagebox.showwarning("Внимание", "Файл не выбран!")
-            return
-
-        # Запрос названия таблицы
-        table_name = simpledialog.askstring("Выбор таблицы", "Введите название таблицы (например, parts, clients):")
-        if not table_name or table_name not in self.table_name_mapping.values():
-            messagebox.showerror("Ошибка", "Неверное название таблицы!")
-            return
-
-        # Чтение данных из Excel
-        try:
-            wb = load_workbook(file_path)
-            ws = wb.active
-
-            # Получение заголовков из первой строки
-            headers = [cell.value for cell in ws[1]]
-
-            # Проверка соответствия заголовков
-            expected_headers = list(self.column_headers[table_name].values())
-            if headers != expected_headers:
-                messagebox.showerror("Ошибка", "Заголовки в файле не соответствуют ожидаемым!")
-                return
-
-            # Подключение к базе данных
-            conn = sqlite3.connect('auto_parts.db')
-            c = conn.cursor()
-
-            # Очистка таблицы перед импортом (опционально)
-            confirm = messagebox.askyesno("Подтверждение", "Очистить таблицу перед импортом?")
-            if confirm:
-                c.execute(f"DELETE FROM {table_name}")
-
-            # Чтение данных из Excel и запись в базу данных
-            for row in ws.iter_rows(min_row=2, values_only=True):  # Пропускаем первую строку (заголовки)
-                insert_query = f"INSERT INTO {table_name} (" + ", ".join(headers) + ") VALUES (" + ", ".join(
-                    ["?"] * len(headers)) + ")"
-                c.execute(insert_query, row)
-
-            conn.commit()
-            conn.close()
-
-            messagebox.showinfo("Успех", "Данные успешно импортированы!")
-
-        except Exception as e:
-            messagebox.showerror("Ошибка", f"Произошла ошибка при импорте: {str(e)}")
-
-    # Обновление текущего представления
-    def refresh_current_view(self):
-        current_frame = self.main_frame.winfo_children()[0]
-        children = current_frame.winfo_children()
-
-        title_label = None
-        for widget in children:
-            if isinstance(widget, tk.Label):
-                title_label = widget
-                break
-
-        if not title_label or "Справочник" not in title_label.cget("text"):
-            return
-
-        russian_table_name = title_label.cget("text").split()[1].lower()
-        table_name = self.table_name_mapping.get(russian_table_name)
-
-        if not table_name:
-            return
-
-        tree = None
-        for widget in children:
-            if isinstance(widget, ttk.Treeview):
-                tree = widget
-                break
-
-        if tree and table_name:
-            self.load_data(tree, table_name)
-
-    # Обновление статуса заказа
-    def update_order_status(self, tree):
+    def change_order_status(self, tree):
         selected_item = tree.selection()
         if not selected_item:
-            messagebox.showwarning("Внимание", "Выберите заказ для обновления статуса!")
+            messagebox.showwarning("Ошибка", "Заказ не выбран!")
             return
+        order_id = tree.item(selected_item[0])['values'][0]
+        current_status = tree.item(selected_item[0])['values'][5]
 
-        order_id = tree.item(selected_item)['values'][0]
-        current_status = tree.item(selected_item)['values'][-1]  # Последний столбец - статус
+        top = Toplevel(self.root)
+        top.title("Изменение статуса заказа")
 
-        # Окно для выбора нового статуса
-        status_window = tk.Toplevel(self.root)
-        status_window.title("Обновление статуса заказа")
-        status_window.geometry("300x200")
-        status_window.configure(bg="#f9f9f9")
+        Label(top, text="Текущий статус:").grid(row=0, column=0)
+        Label(top, text=current_status).grid(row=0, column=1)
 
-        label = tk.Label(status_window, text="Текущий статус:", font=("Arial", 12), bg="#f9f9f9")
-        label.pack(pady=5)
-
-        current_status_label = tk.Label(status_window, text=current_status, font=("Arial", 12, "bold"),
-                                        bg="#f9f9f9")
-        current_status_label.pack(pady=5)
-
-        new_status_label = tk.Label(status_window, text="Новый статус:", font=("Arial", 12), bg="#f9f9f9")
-        new_status_label.pack(pady=5)
-
-        status_var = tk.StringVar(value=current_status)
-        status_options = ["В обработке", "Выполнен", "Отменен"]
-        status_combo = ttk.Combobox(status_window, textvariable=status_var, values=status_options,
-                                    font=("Arial", 12))
-        status_combo.pack(pady=5)
+        Label(top, text="Новый статус:").grid(row=1, column=0)
+        status_var = StringVar(top)
+        status_var.set(current_status)  # Установка текущего статуса как значения по умолчанию
+        status_options = ["Новый", "В обработке", "Выполнен", "Отменён"]
+        status_menu = OptionMenu(top, status_var, *status_options)
+        status_menu.grid(row=1, column=1)
 
         def save_status():
             new_status = status_var.get()
-            if not new_status:
-                messagebox.showerror("Ошибка", "Выберите новый статус!")
-                return
+            update_order_status(order_id, new_status)
+            messagebox.showinfo("Успешно", f"Статус заказа {order_id} изменен на '{new_status}'!")
+            top.destroy()
+            self.update_orders_table()
 
-            conn = sqlite3.connect('auto_parts.db')
-            c = conn.cursor()
-            c.execute("UPDATE orders SET status=? WHERE id=?", (new_status, order_id))
-            conn.commit()
-            conn.close()
+        Button(top, text="Сохранить", command=save_status).grid(row=2, column=0, columnspan=2)
 
-            messagebox.showinfo("Успех", "Статус заказа успешно обновлен!")
-            status_window.destroy()
-            self.refresh_current_view()
-
-        save_button = tk.Button(status_window, text="Сохранить", font=("Arial", 12), bg="#4CAF50", fg="#ffffff",
-                                command=save_status)
-        save_button.pack(pady=10)
-
-    # Редактирование заказа
-    def edit_order(self, tree):
+    def edit_record(self, tree, reference_type):
         selected_item = tree.selection()
         if not selected_item:
-            messagebox.showwarning("Внимание", "Выберите заказ для редактирования!")
+            messagebox.showwarning("Ошибка", "Запись не выбрана!")
             return
+        record_id = tree.item(selected_item[0])['values'][0]
 
-        order_id = tree.item(selected_item)['values'][0]
-        current_quantity = tree.item(selected_item)['values'][3]  # Количество
+        if reference_type == "clients":
+            self.edit_client_form(record_id)
+        elif reference_type == "orders":
+            self.edit_order_form(record_id)
 
-        edit_window = tk.Toplevel(self.root)
-        edit_window.title("Редактирование заказа")
-        edit_window.geometry("300x200")
-        edit_window.configure(bg="#f9f9f9")
+    def edit_order_form(self, order_id):
+        top = Toplevel(self.root)
+        top.title("Редактировать заказ")
 
-        label = tk.Label(edit_window, text="Текущее количество:", font=("Arial", 12), bg="#f9f9f9")
-        label.pack(pady=5)
+        order = [o for o in get_order_details() if o[0] == order_id][0]
 
-        quantity_label = tk.Label(edit_window, text=current_quantity, font=("Arial", 12, "bold"), bg="#f9f9f9")
-        quantity_label.pack(pady=5)
+        Label(top, text="Клиент:").grid(row=0, column=0)
+        client_name_label = Label(top, text=order[1])
+        client_name_label.grid(row=0, column=1)
 
-        new_quantity_label = tk.Label(edit_window, text="Новое количество:", font=("Arial", 12), bg="#f9f9f9")
-        new_quantity_label.pack(pady=5)
+        Label(top, text="Запчасть:").grid(row=1, column=0)
+        part_name_label = Label(top, text=order[2])
+        part_name_label.grid(row=1, column=1)
 
-        new_quantity_entry = tk.Entry(edit_window, font=("Arial", 12))
-        new_quantity_entry.pack(pady=5)
+        Label(top, text="Количество:").grid(row=2, column=0)
+        quantity_entry = Entry(top)
+        quantity_entry.insert(0, order[3])
+        quantity_entry.grid(row=2, column=1)
 
-        def save_changes():
-            new_quantity = new_quantity_entry.get()
-            if not new_quantity:
-                messagebox.showerror("Ошибка", "Введите новое количество!")
-                return
+        Label(top, text="Дата заказа:").grid(row=3, column=0)
+        date_label = Label(top, text=order[4])
+        date_label.grid(row=3, column=1)
 
-            try:
-                int(new_quantity)
-            except ValueError:
-                messagebox.showerror("Ошибка", "Количество должно быть целым числом!")
-                return
-
-            conn = sqlite3.connect('auto_parts.db')
-            c = conn.cursor()
-            c.execute("UPDATE orders SET quantity=? WHERE id=?", (new_quantity, order_id))
-            conn.commit()
-            conn.close()
-
-            messagebox.showinfo("Успех", "Заказ успешно обновлен!")
-            edit_window.destroy()
-            self.refresh_current_view()
-
-        save_button = tk.Button(edit_window, text="Сохранить", font=("Arial", 12), bg="#4CAF50", fg="#ffffff",
-                                command=save_changes)
-        save_button.pack(pady=10)
-
-    # Формирование заказа
-    def create_order(self):
-        self.clear_main_frame()
-        frame = tk.Frame(self.main_frame, bg="#ffffff", padx=30, pady=30)
-        frame.pack(fill=tk.BOTH, expand=True)
-
-        label = tk.Label(frame, text="Формирование заказа", font=("Arial", 18, "bold"), bg="#ffffff")
-        label.pack(pady=10)
-
-        # Выбор поставщика
-        supplier_label = tk.Label(frame, text="Поставщик:", font=("Arial", 12), bg="#ffffff")
-        supplier_label.pack()
-        supplier_combo = ttk.Combobox(frame, width=40, font=("Arial", 12))
-        supplier_combo.pack()
-
-        # Выбор запчасти
-        part_label = tk.Label(frame, text="Запчасть:", font=("Arial", 12), bg="#ffffff")
-        part_label.pack()
-        part_combo = ttk.Combobox(frame, width=40, font=("Arial", 12))
-        part_combo.pack()
-
-        # Доступное количество
-        available_quantity_var = tk.StringVar()
-        available_quantity_label = tk.Label(frame, textvariable=available_quantity_var, font=("Arial", 12, "italic"),
-                                            fg="#555555", bg="#ffffff")
-        available_quantity_label.pack()
-
-        # Количество для заказа
-        quantity_label = tk.Label(frame, text="Количество:", font=("Arial", 12), bg="#ffffff")
-        quantity_label.pack()
-        quantity_entry = tk.Entry(frame, font=("Arial", 12))
-        quantity_entry.pack()
-
-        def update_available_quantity(event):
-            selected_part_id = part_combo.get().split()[0] if part_combo.get() else None
-            if not selected_part_id:
-                available_quantity_var.set("Доступное количество: Не выбрано")
-                return
-
-            conn = sqlite3.connect('auto_parts.db')
-            c = conn.cursor()
-            c.execute("SELECT quantity FROM parts WHERE id=?", (selected_part_id,))
-            available_quantity = c.fetchone()[0]
-            conn.close()
-
-            available_quantity_var.set(f"Доступное количество: {available_quantity}")
-
-        part_combo.bind("<<ComboboxSelected>>", update_available_quantity)
-
-        def validate_quantity():
-            try:
-                int(quantity_entry.get())
-                return True
-            except ValueError:
-                messagebox.showerror("Ошибка", "Количество должно быть целым числом!")
-                return False
+        Label(top, text="Статус:").grid(row=4, column=0)
+        status_var = StringVar(top)
+        status_var.set(order[5])  # Установка текущего статуса как значения по умолчанию
+        status_options = ["Новый", "В обработке", "Выполнен", "Отменён"]
+        status_menu = OptionMenu(top, status_var, *status_options)
+        status_menu.grid(row=4, column=1)
 
         def save_order():
-            supplier_id = supplier_combo.get().split()[0] if supplier_combo.get() else None
-            part_id = part_combo.get().split()[0] if part_combo.get() else None
-            quantity = quantity_entry.get()
-
-            if not supplier_id or not part_id or not quantity:
-                messagebox.showerror("Ошибка", "Заполните все поля!")
-                return
-
-            if not validate_quantity():
-                return
-
+            new_quantity = quantity_entry.get()
+            new_status = status_var.get()
             conn = sqlite3.connect('auto_parts.db')
-            c = conn.cursor()
-
-            # Проверяем доступное количество запчасти
-            c.execute("SELECT quantity FROM parts WHERE id=?", (part_id,))
-            available_quantity = c.fetchone()[0]
-
-            if int(quantity) > available_quantity:
-                messagebox.showerror("Ошибка", "Недостаточно товара на складе!")
-                conn.close()
-                return
-
-            # Вычитаем количество из таблицы parts
-            new_quantity = available_quantity - int(quantity)
-            c.execute("UPDATE parts SET quantity=? WHERE id=?", (new_quantity, part_id))
-
-            # Добавляем заказ
-            c.execute(
-                "INSERT INTO orders (supplier_id, part_id, quantity, order_date, status) VALUES (?, ?, ?, datetime('now'), ?)",
-                (supplier_id, part_id, quantity, "В обработке")
-            )
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE orders SET quantity = ?, status = ? WHERE id = ?
+            ''', (int(new_quantity), new_status, order_id))
             conn.commit()
             conn.close()
 
-            messagebox.showinfo("Успех", "Заказ успешно создан!")
-            self.clear_main_frame()
-            self.show_ref("orders")
+            messagebox.showinfo("Успешно", "Заказ обновлен!")
+            top.destroy()
+            self.update_orders_table()
 
-        save_button = tk.Button(frame, text="Создать заказ", font=("Arial", 12), bg="#4CAF50", fg="#ffffff",
-                                command=save_order, width=20)
-        save_button.pack(pady=10)
+        Button(top, text="Сохранить", command=save_order).grid(row=5, column=0, columnspan=2)
 
-        # Загрузка данных в Combobox
-        conn = sqlite3.connect('auto_parts.db')
-        c = conn.cursor()
-        c.execute("SELECT id, name FROM suppliers")
-        suppliers = [f"{id} {name}" for id, name in c.fetchall()]
-        supplier_combo['values'] = suppliers
+    def delete_record(self, tree, reference_type):
+        selected_item = tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Ошибка", "Запись не выбрана!")
+            return
+        record_id = tree.item(selected_item[0])['values'][0]
 
-        c.execute("SELECT id, name FROM parts")
-        parts = [f"{id} {name}" for id, name in c.fetchall()]
-        part_combo['values'] = parts
-        conn.close()
+        if reference_type == "orders":
+            conn = sqlite3.connect('auto_parts.db')
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM orders WHERE id = ?', (record_id,))
+            conn.commit()
+            conn.close()
 
-    # Показать отчет о продажах
-    def show_sales_report(self):
-        self.clear_main_frame()
-        frame = tk.Frame(self.main_frame, bg="#ffffff", padx=20, pady=20)
-        frame.pack(fill=tk.BOTH, expand=True)
+            messagebox.showinfo("Успешно", f"Заказ {record_id} удален!")
+            tree.delete(selected_item)
+            self.update_orders_table()
 
-        label = tk.Label(frame, text="Отчет о продажах", font=("Arial", 18, "bold"), bg="#ffffff")
-        label.pack(pady=10)
-
-        tree = ttk.Treeview(frame, columns=("ID", "Client", "Part", "Quantity", "Date"), show="headings", height=15,
-                            style="Custom.Treeview")
-        tree.heading("ID", text="ID")
-        tree.heading("Client", text="Клиент")
-        tree.heading("Part", text="Запчасть")
-        tree.heading("Quantity", text="Количество")
-        tree.heading("Date", text="Дата")
-        tree.pack(fill=tk.BOTH, expand=True)
-
-        self.load_sales(tree)
-
-    # Загрузить данные продаж в Treeview
-    def load_sales(self, tree):
-        conn = sqlite3.connect('auto_parts.db')
-        c = conn.cursor()
-        c.execute("""
-                SELECT sales.id, clients.name, parts.name, sales.quantity, sales.sale_date
-                FROM sales
-                INNER JOIN clients ON sales.client_id = clients.id
-                INNER JOIN parts ON sales.part_id = parts.id
-            """)
-        rows = c.fetchall()
-        for row in rows:
-            tree.insert("", tk.END, values=row)
-        conn.close()
-
-    # Показать отчет о заказах
-    def show_orders_report(self):
-        self.clear_main_frame()
-        frame = tk.Frame(self.main_frame, bg="#ffffff", padx=20, pady=20)
-        frame.pack(fill=tk.BOTH, expand=True)
-
-        label = tk.Label(frame, text="Отчет о заказах", font=("Arial", 18, "bold"), bg="#ffffff")
-        label.pack(pady=10)
-
-        tree = ttk.Treeview(frame, columns=("ID", "Supplier", "Part", "Quantity", "Date", "Status"),
-                            show="headings", height=15, style="Custom.Treeview")
-        tree.heading("ID", text="ID")
-        tree.heading("Supplier", text="Поставщик")
-        tree.heading("Part", text="Запчасть")
-        tree.heading("Quantity", text="Количество")
-        tree.heading("Date", text="Дата")
-        tree.heading("Status", text="Статус")
-        tree.pack(fill=tk.BOTH, expand=True)
-
-        self.load_orders(tree)
-
-    # Загрузить данные заказов в Treeview
-    def load_orders(self, tree):
-        conn = sqlite3.connect('auto_parts.db')
-        c = conn.cursor()
-        c.execute("""
-                SELECT orders.id, suppliers.name, parts.name, orders.quantity, orders.order_date, orders.status
-                FROM orders
-                INNER JOIN suppliers ON orders.supplier_id = suppliers.id
-                INNER JOIN parts ON orders.part_id = parts.id
-            """)
-        rows = c.fetchall()
-        for row in rows:
-            tree.insert("", tk.END, values=row)
-        conn.close()
-
-    # Показать руководство
-    def show_manual(self):
-        self.clear_main_frame()
-        frame = tk.Frame(self.main_frame, bg="#ffffff", padx=30, pady=30)
-        frame.pack(fill=tk.BOTH, expand=True)
-
-        label = tk.Label(frame, text="Руководство по использованию", font=("Arial", 18, "bold"), bg="#ffffff")
-        label.pack(pady=10)
-
-        manual_text = """
-        Руководство по использованию программы:
-
-        1. Справочники:
-           - Используйте меню "Справочники" для просмотра, добавления, редактирования и удаления записей.
-           - Доступные справочники: Автозапчасти, Клиенты, Автомобили, Поставщики, Заказы.
-
-        2. Создание заказа:
-           - Перейдите в меню "Создать заказ".
-           - Выберите поставщика и запчасть из выпадающих списков.
-           - Укажите количество для заказа.
-           - Нажмите "Создать заказ". Программа автоматически проверит наличие товара на складе.
-
-        3. Отчеты:
-           - В меню "Отчеты" вы можете просмотреть информацию о продажах и заказах.
-           - Также доступны функции экспорта и импорта данных.
-
-        4. Экспорт в Excel:
-           - Выберите пункт "Экспорт в Excel" в меню "Отчеты".
-           - Укажите название таблицы (например, parts, clients).
-           - Программа создаст файл Excel с данными.
-
-        5. Импорт из Excel:
-           - Выберите пункт "Импорт из Excel" в меню "Справочники".
-           - Укажите путь к файлу Excel и название таблицы.
-           - Программа прочитает данные из файла и добавит их в базу данных.
-           - Подсказка: Убедитесь, что заголовки в файле Excel совпадают с ожидаемыми (например, "Наименование", "Категория").
-
-        6. Очистка таблицы:
-           - При импорте можно очистить таблицу перед добавлением новых данных.
-           - Будьте осторожны: это действие нельзя отменить!
-
-        Для дополнительной помощи обратитесь к разработчику.
-        """
-        manual_label = tk.Label(frame, text=manual_text, justify="left", font=("Arial", 12), bg="#ffffff")
-        manual_label.pack(pady=10)
-
-    # Очистить основной фрейм
-    def clear_main_frame(self):
-        for widget in self.main_frame.winfo_children():
-            widget.destroy()
-
-# Создание базы данных и запуск приложения
 if __name__ == "__main__":
     create_database()
-    root = tk.Tk()
+    root = Tk()
     app = AutoPartsApp(root)
     root.mainloop()
