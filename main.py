@@ -5,10 +5,19 @@ from tkinter import *
 from tkinter import messagebox, ttk, simpledialog, filedialog
 from datetime import datetime
 
-# Создание базы данных и таблиц
 def create_database():
     conn = sqlite3.connect('auto_parts.db')
     cursor = conn.cursor()
+
+    # Таблица автомобилей
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS cars (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand TEXT NOT NULL,
+            model TEXT NOT NULL,
+            year INTEGER NOT NULL
+        )
+    ''')
 
     # Таблица автозапчастей
     cursor.execute('''
@@ -19,7 +28,9 @@ def create_database():
             manufacturer TEXT NOT NULL,
             supplier TEXT NOT NULL,
             price REAL NOT NULL,
-            quantity INTEGER NOT NULL
+            quantity INTEGER NOT NULL,
+            car_id INTEGER,
+            FOREIGN KEY (car_id) REFERENCES cars(id)
         )
     ''')
 
@@ -49,15 +60,14 @@ def create_database():
     conn.commit()
     conn.close()
 
-
 # Функции для работы с таблицами
-def add_part(name, category, manufacturer, supplier, price, quantity):
+def add_part(name, category, manufacturer, supplier, price, quantity, car_id=None):
     conn = sqlite3.connect('auto_parts.db')
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO parts (name, category, manufacturer, supplier, price, quantity)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (name, category, manufacturer, supplier, price, quantity))
+        INSERT INTO parts (name, category, manufacturer, supplier, price, quantity, car_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (name, category, manufacturer, supplier, price, quantity, car_id))
     conn.commit()
     conn.close()
 
@@ -89,6 +99,43 @@ def view_clients():
     rows = cursor.fetchall()
     conn.close()
     return rows
+
+def add_car(brand, model, year):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO cars (brand, model, year)
+        VALUES (?, ?, ?)
+    ''', (brand, model, year))
+    conn.commit()
+    conn.close()
+
+
+def view_cars():
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM cars')
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
+def delete_car(car_id):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM cars WHERE id = ?', (car_id,))
+    conn.commit()
+    conn.close()
+
+
+def update_car(car_id, brand, model, year):
+    conn = sqlite3.connect('auto_parts.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE cars SET brand = ?, model = ?, year = ? WHERE id = ?
+    ''', (brand, model, year, car_id))
+    conn.commit()
+    conn.close()
 
 def view_suppliers():
     conn = sqlite3.connect('auto_parts.db')
@@ -210,23 +257,15 @@ def select_parts():
 
     selected_parts = []
 
-    def add_part():
-        selected_item = tree.selection()
-        if not selected_item:
-            messagebox.showwarning("Ошибка", "Автозапчасть не выбрана!")
-            return
-        part_id = tree.item(selected_item[0])['values'][0]
-        part_name = tree.item(selected_item[0])['values'][1]
-        part_price = float(tree.item(selected_item[0])['values'][2])  # Преобразование строки в число
-        part_quantity = int(tree.item(selected_item[0])['values'][3])  # Преобразование строки в число
-
-        quantity = simpledialog.askinteger("Количество", f"Введите количество для {part_name}:")
-        if not quantity or quantity > part_quantity:
-            messagebox.showwarning("Ошибка", f"Недостаточно запчастей ({part_quantity} доступно)!")
-            return
-
-        selected_parts.append((part_id, part_name, part_price, quantity))
-        update_cart()
+    def add_part(name, category, manufacturer, supplier, price, quantity, car_id=None):
+        conn = sqlite3.connect('auto_parts.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO parts (name, category, manufacturer, supplier, price, quantity, car_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (name, category, manufacturer, supplier, price, quantity, car_id))
+        conn.commit()
+        conn.close()
 
     cart_tree = ttk.Treeview(top, columns=("ID", "Название", "Цена", "Количество"), show="headings")
     cart_tree.heading("ID", text="ID")
@@ -254,6 +293,7 @@ def select_parts():
 
     top.wait_window()  # Ожидаем закрытия окна
     return selected_parts
+
 def create_order():
     client_id = select_client()
     if not client_id:
@@ -314,19 +354,19 @@ class AutoPartsApp:
 
         reference_menu = Menu(menu, tearoff=0)
         menu.add_cascade(label="Справочники", menu=reference_menu)
+        reference_menu.add_command(label="Автомобили", command=lambda: self.show_reference("cars"))
         reference_menu.add_command(label="Клиенты", command=lambda: self.show_reference("clients"))
         reference_menu.add_command(label="Заказы", command=self.show_orders)
 
         file_menu = Menu(menu, tearoff=0)
         menu.add_cascade(label="Файл", menu=file_menu)
+        file_menu.add_command(label="Экспорт в Excel", command=self.export_to_excel)
+        file_menu.add_command(label="Импорт из Excel", command=self.import_from_excel)
         file_menu.add_command(label="Выход", command=root.quit)
 
         report_menu = Menu(menu, tearoff=0)
         menu.add_cascade(label="Отчеты", menu=report_menu)
         report_menu.add_command(label="Создать PDF отчет", command=self.generate_pdf_report)
-
-        file_menu.add_command(label="Экспорт в Excel", command=self.export_to_excel)
-        file_menu.add_command(label="Импорт из Excel", command=self.import_from_excel)
 
         help_menu = Menu(menu, tearoff=0)
         menu.add_cascade(label="Помощь", menu=help_menu)
@@ -339,8 +379,10 @@ class AutoPartsApp:
         Label(main_frame, text="Таблица автозапчастей").pack()
 
         # Список автозапчастей
-        self.parts_tree = ttk.Treeview(main_frame, columns=("ID", "Name", "Category", "Manufacturer", "Supplier", "Price", "Quantity"), show="headings")
+        self.parts_tree = ttk.Treeview(main_frame, columns=(
+        "ID", "Name", "Category", "Manufacturer", "Supplier", "Price", "Quantity", "Автомобиль"), show="headings")
         self.parts_tree.pack(pady=10)
+        self.parts_tree.heading("Автомобиль", text="Автомобиль")
         self.parts_tree.heading("ID", text="ID")
         self.parts_tree.heading("Name", text="Название")
         self.parts_tree.heading("Category", text="Категория")
@@ -362,8 +404,13 @@ class AutoPartsApp:
         for i in self.parts_tree.get_children():
             self.parts_tree.delete(i)
         parts = view_parts()
+        cars = view_cars()
+        car_dict = {car[0]: f"{car[1]} {car[2]} ({car[3]})" for car in cars}  # Словарь для отображения автомобилей
+
         for part in parts:
-            self.parts_tree.insert("", END, values=part)
+            car_id = part[7]  # Поле car_id в таблице parts
+            car_info = car_dict.get(car_id, "Не указано")  # Если car_id пустой, показываем "Не указано"
+            self.parts_tree.insert("", END, values=(*part[:7], car_info))
 
     def add_part_form(self):
         top = Toplevel(self.root)
@@ -393,7 +440,40 @@ class AutoPartsApp:
         quantity_entry = Entry(top)
         quantity_entry.grid(row=5, column=1)
 
-        Button(top, text="Сохранить", command=lambda: self.save_part(name_entry.get(), category_entry.get(), manufacturer_entry.get(), supplier_entry.get(), price_entry.get(), quantity_entry.get(), top)).grid(row=6, column=0, columnspan=2)
+        # Добавление выбора автомобиля
+        Label(top, text="Автомобиль:").grid(row=6, column=0)
+        car_var = StringVar(top)
+        cars = view_cars()
+        car_options = {f"{car[1]} {car[2]} ({car[3]})": car[0] for car in cars}
+        car_menu = OptionMenu(top, car_var, *car_options.keys())
+        car_menu.grid(row=6, column=1)
+
+        def save_part():
+            name = name_entry.get()
+            category = category_entry.get()
+            manufacturer = manufacturer_entry.get()
+            supplier = supplier_entry.get()
+            price = price_entry.get()
+            quantity = quantity_entry.get()
+            car_id = car_options.get(car_var.get())
+
+            if not name or not category or not manufacturer or not supplier or not price or not quantity:
+                messagebox.showwarning("Ошибка", "Заполните все поля!")
+                return
+
+            try:
+                price = float(price)
+                quantity = int(quantity)
+            except ValueError:
+                messagebox.showwarning("Ошибка", "Цена и количество должны быть числами!")
+                return
+
+            add_part(name, category, manufacturer, supplier, price, quantity, car_id)
+            messagebox.showinfo("Успешно", "Автозапчасть добавлена!")
+            top.destroy()
+            self.update_parts_list()
+
+        Button(top, text="Сохранить", command=save_part).grid(row=7, column=0, columnspan=2)
 
     def save_part(self, name, category, manufacturer, supplier, price, quantity, window):
         add_part(name, category, manufacturer, supplier, float(price), int(quantity))
@@ -500,6 +580,71 @@ class AutoPartsApp:
 
         Button(top, text="Сохранить", command=save_client).grid(row=2, column=0, columnspan=2)
 
+    def edit_client_form(self, client_id):
+        top = Toplevel(self.root)
+        top.title("Редактировать клиента")
+
+        client = [c for c in view_clients() if c[0] == client_id][0]
+
+        Label(top, text="ФИО:").grid(row=0, column=0)
+        full_name_entry = Entry(top)
+        full_name_entry.insert(0, client[1])
+        full_name_entry.grid(row=0, column=1)
+
+        Label(top, text="Телефон:").grid(row=1, column=0)
+        phone_entry = Entry(top)
+        phone_entry.insert(0, client[2])
+        phone_entry.grid(row=1, column=1)
+
+        def save_client():
+            full_name = full_name_entry.get()
+            phone = phone_entry.get()
+
+            if not full_name or not phone:
+                messagebox.showwarning("Ошибка", "Заполните все поля!")
+                return
+
+            conn = sqlite3.connect('auto_parts.db')
+            cursor = conn.cursor()
+
+            try:
+                cursor.execute('''
+                    UPDATE clients SET full_name = ?, phone = ? WHERE id = ?
+                ''', (full_name, phone, client_id))
+                conn.commit()
+                messagebox.showinfo("Успешно", "Клиент обновлен!")
+                top.destroy()
+            except Exception as e:
+                conn.rollback()
+                messagebox.showerror("Ошибка", f"Не удалось обновить клиента: {e}")
+            finally:
+                conn.close()
+
+        Button(top, text="Сохранить", command=save_client).grid(row=2, column=0, columnspan=2)
+
+    def delete_client(self, tree):
+        selected_item = tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Ошибка", "Клиент не выбран!")
+            return
+
+        client_id = tree.item(selected_item[0])['values'][0]
+
+        conn = sqlite3.connect('auto_parts.db')
+        cursor = conn.cursor()
+
+        try:
+            # Удаление клиента из базы данных
+            cursor.execute('DELETE FROM clients WHERE id = ?', (client_id,))
+            conn.commit()
+            messagebox.showinfo("Успешно", f"Клиент {client_id} удален!")
+            tree.delete(selected_item)  # Удаляем запись из таблицы в интерфейсе
+        except Exception as e:
+            conn.rollback()
+            messagebox.showerror("Ошибка", f"Не удалось удалить клиента: {e}")
+        finally:
+            conn.close()
+
     def update_orders_table(self):
         if self.orders_tree:
             for i in self.orders_tree.get_children():
@@ -516,10 +661,11 @@ class AutoPartsApp:
             columns = ["ID", "ФИО", "Телефон"]
             data = view_clients()
             add_func = lambda: self.add_client_form(top)
-        elif reference_type == "suppliers":
-            columns = ["ID", "Название", "Телефон"]
-            data = view_suppliers()
-            add_func = lambda: self.add_supplier_form(top)
+
+        elif reference_type == "cars":
+            columns = ["ID", "Марка", "Модель", "Год выпуска"]
+            data = view_cars()
+            add_func = lambda: self.add_car_form(top)
 
         tree = ttk.Treeview(top, columns=columns, show="headings")
         for col in columns:
@@ -577,6 +723,124 @@ class AutoPartsApp:
                                                                                                          column=2,
                                                                                                          pady=5)
 
+    def show_cars(self):
+        top = Toplevel(self.root)
+        top.title("Автомобили")
+
+        columns = ["ID", "Марка", "Модель", "Год выпуска"]
+        tree = ttk.Treeview(top, columns=columns, show="headings")
+        for col in columns:
+            tree.heading(col, text=col)
+        tree.pack(pady=10)
+
+        data = view_cars()
+        for row in data:
+            tree.insert("", END, values=row)
+
+        Button(top, text="Добавить", command=lambda: self.add_car_form(top)).pack(side=LEFT, padx=5)
+        Button(top, text="Редактировать", command=lambda: self.edit_car(tree)).pack(side=LEFT, padx=5)
+        Button(top, text="Удалить", command=lambda: self.delete_car_record(tree)).pack(side=LEFT, padx=5)
+
+    def add_car_form(self, parent):
+        top = Toplevel(parent)
+        top.title("Добавить автомобиль")
+
+        Label(top, text="Марка:").grid(row=0, column=0)
+        brand_entry = Entry(top)
+        brand_entry.grid(row=0, column=1)
+
+        Label(top, text="Модель:").grid(row=1, column=0)
+        model_entry = Entry(top)
+        model_entry.grid(row=1, column=1)
+
+        Label(top, text="Год выпуска:").grid(row=2, column=0)
+        year_entry = Entry(top)
+        year_entry.grid(row=2, column=1)
+
+        def save_car():
+            brand = brand_entry.get()
+            model = model_entry.get()
+            year = year_entry.get()
+
+            if not brand or not model or not year:
+                messagebox.showwarning("Ошибка", "Заполните все поля!")
+                return
+
+            try:
+                year = int(year)
+            except ValueError:
+                messagebox.showwarning("Ошибка", "Год выпуска должен быть числом!")
+                return
+
+            add_car(brand, model, year)
+            messagebox.showinfo("Успешно", "Автомобиль добавлен!")
+            top.destroy()
+
+        Button(top, text="Сохранить", command=save_car).grid(row=3, column=0, columnspan=2)
+
+    def edit_car(self, tree):
+        selected_item = tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Ошибка", "Автомобиль не выбран!")
+            return
+
+        car_id = tree.item(selected_item[0])['values'][0]
+        self.edit_car_form(car_id)
+
+    def edit_car_form(self, car_id):
+        top = Toplevel(self.root)
+        top.title("Редактировать автомобиль")
+
+        car = [c for c in view_cars() if c[0] == car_id][0]
+
+        Label(top, text="Марка:").grid(row=0, column=0)
+        brand_entry = Entry(top)
+        brand_entry.insert(0, car[1])
+        brand_entry.grid(row=0, column=1)
+
+        Label(top, text="Модель:").grid(row=1, column=0)
+        model_entry = Entry(top)
+        model_entry.insert(0, car[2])
+        model_entry.grid(row=1, column=1)
+
+        Label(top, text="Год выпуска:").grid(row=2, column=0)
+        year_entry = Entry(top)
+        year_entry.insert(0, car[3])
+        year_entry.grid(row=2, column=1)
+
+        def save_car():
+            brand = brand_entry.get()
+            model = model_entry.get()
+            year = year_entry.get()
+
+            if not brand or not model or not year:
+                messagebox.showwarning("Ошибка", "Заполните все поля!")
+                return
+
+            try:
+                year = int(year)
+            except ValueError:
+                messagebox.showwarning("Ошибка", "Год выпуска должен быть числом!")
+                return
+
+            update_car(car_id, brand, model, year)
+            messagebox.showinfo("Успешно", "Автомобиль обновлен!")
+            top.destroy()
+
+        Button(top, text="Сохранить", command=save_car).grid(row=3, column=0, columnspan=2)
+
+    def delete_car_record(self, tree):
+        selected_item = tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Ошибка", "Автомобиль не выбран!")
+            return
+
+        car_id = tree.item(selected_item[0])['values'][0]
+
+        delete_car(car_id)
+        messagebox.showinfo("Успешно", f"Автомобиль {car_id} удален!")
+        tree.delete(selected_item)
+
     def update_orders_table(self):
         if self.orders_tree:
             for i in self.orders_tree.get_children():
@@ -627,6 +891,7 @@ class AutoPartsApp:
         if not selected_item:
             messagebox.showwarning("Ошибка", "Запись не выбрана!")
             return
+
         record_id = tree.item(selected_item[0])['values'][0]
 
         if reference_type == "clients":
