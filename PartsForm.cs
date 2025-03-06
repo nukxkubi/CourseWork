@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Data;
 using System.Data.SQLite;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace AutoPartsSellerApp
@@ -13,6 +14,8 @@ namespace AutoPartsSellerApp
         {
             InitializeComponent();
             LoadData();
+            LoadCars();
+            LoadSuppliers();
         }
 
         private void LoadData()
@@ -20,13 +23,17 @@ namespace AutoPartsSellerApp
             using (SQLiteConnection conn = new SQLiteConnection(ConnectionString))
             {
                 conn.Open();
-                string sql = "SELECT * FROM Parts";
+                string sql = @"
+                    SELECT Parts.Id, Parts.Name, Parts.Description, Parts.Price, Parts.StockQuantity, 
+                           Cars.Make || ' ' || Cars.Model AS Car, Suppliers.Name AS Supplier
+                    FROM Parts
+                    LEFT JOIN Cars ON Parts.CarId = Cars.Id
+                    LEFT JOIN Suppliers ON Parts.SupplierId = Suppliers.Id";
                 using (SQLiteDataAdapter da = new SQLiteDataAdapter(sql, conn))
                 {
                     DataTable dt = new DataTable();
                     da.Fill(dt);
 
-                    // Назначаем DataGridView данные из таблицы
                     dataGridView.DataSource = dt;
 
                     // Переименовываем колонки на русский язык
@@ -35,9 +42,46 @@ namespace AutoPartsSellerApp
                     dataGridView.Columns["Description"].HeaderText = "Описание";
                     dataGridView.Columns["Price"].HeaderText = "Цена";
                     dataGridView.Columns["StockQuantity"].HeaderText = "Количество на складе";
+                    dataGridView.Columns["Car"].HeaderText = "Автомобиль";
+                    dataGridView.Columns["Supplier"].HeaderText = "Поставщик";
 
-                    // Подгоняем размер таблицы
                     dataGridView.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                }
+            }
+        }
+
+        private void LoadCars()
+        {
+            using (SQLiteConnection conn = new SQLiteConnection(ConnectionString))
+            {
+                conn.Open();
+                string sql = "SELECT Id, Make || ' ' || Model AS Car FROM Cars";
+                using (SQLiteDataAdapter da = new SQLiteDataAdapter(sql, conn))
+                {
+                    DataTable dt = new DataTable();
+                    da.Fill(dt);
+
+                    comboBoxCars.DataSource = dt;
+                    comboBoxCars.DisplayMember = "Car";
+                    comboBoxCars.ValueMember = "Id";
+                }
+            }
+        }
+
+        private void LoadSuppliers()
+        {
+            using (SQLiteConnection conn = new SQLiteConnection(ConnectionString))
+            {
+                conn.Open();
+                string sql = "SELECT Id, Name FROM Suppliers";
+                using (SQLiteDataAdapter da = new SQLiteDataAdapter(sql, conn))
+                {
+                    DataTable dt = new DataTable();
+                    da.Fill(dt);
+
+                    comboBoxSuppliers.DataSource = dt;
+                    comboBoxSuppliers.DisplayMember = "Name";
+                    comboBoxSuppliers.ValueMember = "Id";
                 }
             }
         }
@@ -47,17 +91,21 @@ namespace AutoPartsSellerApp
             using (SQLiteConnection conn = new SQLiteConnection(ConnectionString))
             {
                 conn.Open();
-                string sql = "INSERT INTO Parts (Name, Description, Price, StockQuantity) VALUES (@Name, @Description, @Price, @StockQuantity)";
+                string sql = @"
+                    INSERT INTO Parts (Name, Description, Price, StockQuantity, CarId, SupplierId)
+                    VALUES (@Name, @Description, @Price, @StockQuantity, @CarId, @SupplierId)";
                 using (SQLiteCommand cmd = new SQLiteCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@Name", txtName.Text);
                     cmd.Parameters.AddWithValue("@Description", txtDescription.Text);
                     cmd.Parameters.AddWithValue("@Price", decimal.Parse(txtPrice.Text));
                     cmd.Parameters.AddWithValue("@StockQuantity", int.Parse(txtStockQuantity.Text));
+                    cmd.Parameters.AddWithValue("@CarId", comboBoxCars.SelectedValue);
+                    cmd.Parameters.AddWithValue("@SupplierId", comboBoxSuppliers.SelectedValue);
                     cmd.ExecuteNonQuery();
                 }
             }
-            LoadData(); // Обновляем данные после добавления
+            LoadData();
         }
 
         private void btnEdit_Click(object sender, EventArgs e)
@@ -69,18 +117,24 @@ namespace AutoPartsSellerApp
                 using (SQLiteConnection conn = new SQLiteConnection(ConnectionString))
                 {
                     conn.Open();
-                    string sql = "UPDATE Parts SET Name = @Name, Description = @Description, Price = @Price, StockQuantity = @StockQuantity WHERE Id = @Id";
+                    string sql = @"
+                        UPDATE Parts 
+                        SET Name = @Name, Description = @Description, Price = @Price, 
+                            StockQuantity = @StockQuantity, CarId = @CarId, SupplierId = @SupplierId
+                        WHERE Id = @Id";
                     using (SQLiteCommand cmd = new SQLiteCommand(sql, conn))
                     {
                         cmd.Parameters.AddWithValue("@Name", txtName.Text);
                         cmd.Parameters.AddWithValue("@Description", txtDescription.Text);
                         cmd.Parameters.AddWithValue("@Price", decimal.Parse(txtPrice.Text));
                         cmd.Parameters.AddWithValue("@StockQuantity", int.Parse(txtStockQuantity.Text));
+                        cmd.Parameters.AddWithValue("@CarId", comboBoxCars.SelectedValue);
+                        cmd.Parameters.AddWithValue("@SupplierId", comboBoxSuppliers.SelectedValue);
                         cmd.Parameters.AddWithValue("@Id", id);
                         cmd.ExecuteNonQuery();
                     }
                 }
-                LoadData(); // Обновляем данные после редактирования
+                LoadData();
             }
             else
             {
@@ -104,7 +158,7 @@ namespace AutoPartsSellerApp
                         cmd.ExecuteNonQuery();
                     }
                 }
-                LoadData(); // Обновляем данные после удаления
+                LoadData();
             }
             else
             {
