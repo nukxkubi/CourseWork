@@ -123,13 +123,13 @@ namespace AutoPartsSellerApp
                     {
                         DataTable dt = new DataTable();
                         da.Fill(dt);
-
+        
                         // Вывод данных в консоль для проверки
                         foreach (DataRow row in dt.Rows)
                         {
                             Console.WriteLine($"Id: {row["Id"]}, Car: {row["Car"]}");
                         }
-
+        
                         comboBoxCars.DataSource = dt;
                         comboBoxCars.DisplayMember = "Car";
                         comboBoxCars.ValueMember = "Id";
@@ -141,7 +141,7 @@ namespace AutoPartsSellerApp
                 MessageBox.Show("Ошибка при загрузке автомобилей: " + ex.Message);
             }
         }
-
+        
         private void LoadSuppliers()
         {
             try
@@ -154,13 +154,13 @@ namespace AutoPartsSellerApp
                     {
                         DataTable dt = new DataTable();
                         da.Fill(dt);
-
+        
                         // Вывод данных в консоль для проверки
                         foreach (DataRow row in dt.Rows)
                         {
                             Console.WriteLine($"Id: {row["Id"]}, Name: {row["Name"]}");
                         }
-
+        
                         comboBoxSuppliers.DataSource = dt;
                         comboBoxSuppliers.DisplayMember = "Name";
                         comboBoxSuppliers.ValueMember = "Id";
