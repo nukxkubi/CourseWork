@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Data;
 using System.Data.SQLite;
 using System.Windows.Forms;
@@ -13,6 +13,8 @@ namespace AutoPartsSellerApp
         {
             InitializeComponent();
             LoadData();
+            LoadCustomers();
+            LoadParts();
         }
 
         private void LoadData()
@@ -20,7 +22,15 @@ namespace AutoPartsSellerApp
             using (SQLiteConnection conn = new SQLiteConnection(ConnectionString))
             {
                 conn.Open();
-                string sql = "SELECT * FROM Orders";
+                string sql = @"
+                    SELECT Orders.Id, 
+                           Customers.Name AS CustomerName, 
+                           Parts.Name AS PartName, 
+                           Orders.Quantity, 
+                           Orders.OrderDate
+                    FROM Orders
+                    LEFT JOIN Customers ON Orders.CustomerId = Customers.Id
+                    LEFT JOIN Parts ON Orders.PartId = Parts.Id";
                 using (SQLiteDataAdapter da = new SQLiteDataAdapter(sql, conn))
                 {
                     DataTable dt = new DataTable();
@@ -28,13 +38,50 @@ namespace AutoPartsSellerApp
 
                     dataGridView.DataSource = dt;
 
+                    // Переименовываем колонки на русский язык
                     dataGridView.Columns["Id"].HeaderText = "Id";
-                    dataGridView.Columns["CustomerId"].HeaderText = "ID клиента";
-                    dataGridView.Columns["PartId"].HeaderText = "ID запчасти";
+                    dataGridView.Columns["CustomerName"].HeaderText = "Клиент";
+                    dataGridView.Columns["PartName"].HeaderText = "Запчасть";
                     dataGridView.Columns["Quantity"].HeaderText = "Количество";
                     dataGridView.Columns["OrderDate"].HeaderText = "Дата заказа";
 
                     dataGridView.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                }
+            }
+        }
+
+        private void LoadCustomers()
+        {
+            using (SQLiteConnection conn = new SQLiteConnection(ConnectionString))
+            {
+                conn.Open();
+                string sql = "SELECT Id, Name FROM Customers";
+                using (SQLiteDataAdapter da = new SQLiteDataAdapter(sql, conn))
+                {
+                    DataTable dt = new DataTable();
+                    da.Fill(dt);
+
+                    comboBoxCustomers.DataSource = dt;
+                    comboBoxCustomers.DisplayMember = "Name";
+                    comboBoxCustomers.ValueMember = "Id";
+                }
+            }
+        }
+
+        private void LoadParts()
+        {
+            using (SQLiteConnection conn = new SQLiteConnection(ConnectionString))
+            {
+                conn.Open();
+                string sql = "SELECT Id, Name FROM Parts";
+                using (SQLiteDataAdapter da = new SQLiteDataAdapter(sql, conn))
+                {
+                    DataTable dt = new DataTable();
+                    da.Fill(dt);
+
+                    comboBoxParts.DataSource = dt;
+                    comboBoxParts.DisplayMember = "Name";
+                    comboBoxParts.ValueMember = "Id";
                 }
             }
         }
@@ -44,11 +91,13 @@ namespace AutoPartsSellerApp
             using (SQLiteConnection conn = new SQLiteConnection(ConnectionString))
             {
                 conn.Open();
-                string sql = "INSERT INTO Orders (CustomerId, PartId, Quantity, OrderDate) VALUES (@CustomerId, @PartId, @Quantity, @OrderDate)";
+                string sql = @"
+                    INSERT INTO Orders (CustomerId, PartId, Quantity, OrderDate)
+                    VALUES (@CustomerId, @PartId, @Quantity, @OrderDate)";
                 using (SQLiteCommand cmd = new SQLiteCommand(sql, conn))
                 {
-                    cmd.Parameters.AddWithValue("@CustomerId", int.Parse(txtCustomerId.Text));
-                    cmd.Parameters.AddWithValue("@PartId", int.Parse(txtPartId.Text));
+                    cmd.Parameters.AddWithValue("@CustomerId", comboBoxCustomers.SelectedValue);
+                    cmd.Parameters.AddWithValue("@PartId", comboBoxParts.SelectedValue);
                     cmd.Parameters.AddWithValue("@Quantity", int.Parse(txtQuantity.Text));
                     cmd.Parameters.AddWithValue("@OrderDate", DateTime.Now.ToString("yyyy-MM-dd"));
                     cmd.ExecuteNonQuery();
@@ -66,11 +115,14 @@ namespace AutoPartsSellerApp
                 using (SQLiteConnection conn = new SQLiteConnection(ConnectionString))
                 {
                     conn.Open();
-                    string sql = "UPDATE Orders SET CustomerId = @CustomerId, PartId = @PartId, Quantity = @Quantity, OrderDate = @OrderDate WHERE Id = @Id";
+                    string sql = @"
+                        UPDATE Orders 
+                        SET CustomerId = @CustomerId, PartId = @PartId, Quantity = @Quantity, OrderDate = @OrderDate
+                        WHERE Id = @Id";
                     using (SQLiteCommand cmd = new SQLiteCommand(sql, conn))
                     {
-                        cmd.Parameters.AddWithValue("@CustomerId", int.Parse(txtCustomerId.Text));
-                        cmd.Parameters.AddWithValue("@PartId", int.Parse(txtPartId.Text));
+                        cmd.Parameters.AddWithValue("@CustomerId", comboBoxCustomers.SelectedValue);
+                        cmd.Parameters.AddWithValue("@PartId", comboBoxParts.SelectedValue);
                         cmd.Parameters.AddWithValue("@Quantity", int.Parse(txtQuantity.Text));
                         cmd.Parameters.AddWithValue("@OrderDate", DateTime.Now.ToString("yyyy-MM-dd"));
                         cmd.Parameters.AddWithValue("@Id", id);
