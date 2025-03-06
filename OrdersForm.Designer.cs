@@ -1,11 +1,11 @@
-﻿namespace AutoPartsSellerApp
+namespace AutoPartsSellerApp
 {
     partial class OrdersForm
     {
         private System.ComponentModel.IContainer components = null;
         private System.Windows.Forms.DataGridView dataGridView;
-        private System.Windows.Forms.TextBox txtCustomerId;
-        private System.Windows.Forms.TextBox txtPartId;
+        private System.Windows.Forms.ComboBox comboBoxCustomers;
+        private System.Windows.Forms.ComboBox comboBoxParts;
         private System.Windows.Forms.TextBox txtQuantity;
         private System.Windows.Forms.Button btnAdd;
         private System.Windows.Forms.Button btnEdit;
@@ -28,8 +28,8 @@
         {
             this.tableLayoutPanel = new System.Windows.Forms.TableLayoutPanel();
             this.dataGridView = new System.Windows.Forms.DataGridView();
-            this.txtCustomerId = new System.Windows.Forms.TextBox();
-            this.txtPartId = new System.Windows.Forms.TextBox();
+            this.comboBoxCustomers = new System.Windows.Forms.ComboBox();
+            this.comboBoxParts = new System.Windows.Forms.ComboBox();
             this.txtQuantity = new System.Windows.Forms.TextBox();
             this.btnAdd = new System.Windows.Forms.Button();
             this.btnEdit = new System.Windows.Forms.Button();
@@ -46,9 +46,9 @@
             this.tableLayoutPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 30F));
             this.tableLayoutPanel.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 70F));
             this.tableLayoutPanel.Controls.Add(this.label1, 0, 0);
-            this.tableLayoutPanel.Controls.Add(this.txtCustomerId, 1, 0);
+            this.tableLayoutPanel.Controls.Add(this.comboBoxCustomers, 1, 0);
             this.tableLayoutPanel.Controls.Add(this.label2, 0, 1);
-            this.tableLayoutPanel.Controls.Add(this.txtPartId, 1, 1);
+            this.tableLayoutPanel.Controls.Add(this.comboBoxParts, 1, 1);
             this.tableLayoutPanel.Controls.Add(this.label3, 0, 2);
             this.tableLayoutPanel.Controls.Add(this.txtQuantity, 1, 2);
             this.tableLayoutPanel.Controls.Add(this.btnAdd, 0, 3);
@@ -77,19 +77,23 @@
             this.dataGridView.Size = new System.Drawing.Size(794, 304);
             this.dataGridView.TabIndex = 0;
 
-            // txtCustomerId
-            this.txtCustomerId.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.txtCustomerId.Location = new System.Drawing.Point(243, 3);
-            this.txtCustomerId.Name = "txtCustomerId";
-            this.txtCustomerId.Size = new System.Drawing.Size(554, 20);
-            this.txtCustomerId.TabIndex = 1;
+            // comboBoxCustomers
+            this.comboBoxCustomers.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.comboBoxCustomers.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.comboBoxCustomers.FormattingEnabled = true;
+            this.comboBoxCustomers.Location = new System.Drawing.Point(243, 3);
+            this.comboBoxCustomers.Name = "comboBoxCustomers";
+            this.comboBoxCustomers.Size = new System.Drawing.Size(554, 21);
+            this.comboBoxCustomers.TabIndex = 1;
 
-            // txtPartId
-            this.txtPartId.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.txtPartId.Location = new System.Drawing.Point(243, 33);
-            this.txtPartId.Name = "txtPartId";
-            this.txtPartId.Size = new System.Drawing.Size(554, 20);
-            this.txtPartId.TabIndex = 2;
+            // comboBoxParts
+            this.comboBoxParts.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.comboBoxParts.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.comboBoxParts.FormattingEnabled = true;
+            this.comboBoxParts.Location = new System.Drawing.Point(243, 33);
+            this.comboBoxParts.Name = "comboBoxParts";
+            this.comboBoxParts.Size = new System.Drawing.Size(554, 21);
+            this.comboBoxParts.TabIndex = 2;
 
             // txtQuantity
             this.txtQuantity.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -132,7 +136,7 @@
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(234, 30);
             this.label1.TabIndex = 7;
-            this.label1.Text = "ID клиента:";
+            this.label1.Text = "Клиент:";
             this.label1.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
 
             // label2
@@ -142,7 +146,7 @@
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(234, 30);
             this.label2.TabIndex = 8;
-            this.label2.Text = "ID запчасти:";
+            this.label2.Text = "Запчасть:";
             this.label2.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
 
             // label3
